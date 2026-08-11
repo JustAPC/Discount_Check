@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "CB Reminder",
+  "version": "1.0.0",
+  "description": "Ricorda gli sconti Corporate Benefits mentre fai acquisti online.",
+  "permissions": ["storage", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "dashboard.html", "default_title": "CB Reminder" },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}
