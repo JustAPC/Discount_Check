@@ -30,6 +30,8 @@
     margin: 14px 0 6px; border-top: 1px solid #f3f4f6; padding-top: 10px; }
   input { width: 100%; padding: 7px 9px; border: 1px solid #e5e7eb; border-radius: 7px;
     font: inherit; font-size: 12px; }
+  #rev-cfg input { margin-bottom: 6px; }
+  .pct.rev { color: #5b21b6; background: #ede9fe; }
   .list { max-height: 190px; overflow-y: auto; }
   .item { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid #f9fafb; font-size: 12px; }
   .item .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -50,6 +52,7 @@
     input { background: #1f2937; border-color: #374151; color: #f3f4f6; }
     h2, .item { border-color: #1f2937; }
     .pct { color: #6ee7b7; background: #064e3b; }
+    .pct.rev { color: #ddd6fe; background: #3b0764; }
     .warn-box { background: #3f2d0b; border-color: #78350f; color: #fcd34d; }
     .mini { color: #9ca3af; }
     .mini:hover { color: #fff; }
@@ -73,6 +76,13 @@
     <div class="stat"><b id="s-dom">–</b><span>con dominio</span></div>
     <div class="stat"><b id="s-gc">–</b><span>gift card</span></div>
   </div>
+
+  <h2>Revolut</h2>
+  <div class="sub" id="rev-sub">Non configurato.</div>
+  <div class="row">
+    <button class="ghost" id="rev-sync">Aggiorna Revolut</button>
+  </div>
+  <div class="list" id="rev-list"></div>
 
   <h2>Cerca nel catalogo</h2>
   <input id="q" placeholder="Apple, Zalando, Expedia…" autocomplete="off">

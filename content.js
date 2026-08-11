@@ -12,7 +12,9 @@
   chrome.runtime.sendMessage({ type: 'check', host: location.hostname }, res => {
     if (chrome.runtime.lastError || !res || res.muted) return;
     state = res;
-    if (!res.offers.length && !res.empty) return;   // niente da dire su questo sito
+    state.rev = res.rev || [];
+    // Revolut da solo basta a far uscire il popup: non dipende dalle convenzioni CB.
+    if (!res.offers.length && !state.rev.length && !res.empty) return;
     watch();
   });
 
@@ -55,7 +57,7 @@
     if (shown || !state) return;
 
     // Catalogo mai sincronizzato: non so se il sito è convenzionato, avviso 1 volta al giorno.
-    if (!state.offers.length) {
+    if (!state.offers.length && !state.rev.length) {
       if (!state.empty) return;
       const r = await send({ type: 'nudge' });
       if (!r || !r.show) return;
@@ -104,6 +106,7 @@
       .o { display:flex; gap:12px; align-items:flex-start; padding:11px 0; border-top:1px solid #f3f4f6; }
       .pct { font-weight:700; font-size:13px; color:#065f46; background:#ecfdf5; border-radius:7px;
         padding:4px 8px; white-space:nowrap; flex:none; }
+      .pct.rev { color:#4c1d95; background:#ede9fe; }
       .t { font-weight:600; }
       .k { font-size:12px; color:#6b7280; }
       .go { margin-left:auto; flex:none; background:#111827; color:#fff; border:0; border-radius:8px;
@@ -117,6 +120,7 @@
         .card { background:#111827; color:#f3f4f6; border-color:#374151; }
         .o { border-top-color:#1f2937; } .ft { border-top-color:#1f2937; }
         .pct { color:#6ee7b7; background:#064e3b; }
+        .pct.rev { color:#ddd6fe; background:#3b0764; }
         .go { background:#f3f4f6; color:#111827; }
         .go:hover { background:#fff; color:#111827; }
         .warn-box { background:#3f2d0b; border-color:#78350f; color:#fcd34d; }
@@ -163,14 +167,36 @@
   }
 
   function offersCard() {
-    const n = state.offers.length;
+    const n = state.offers.length + state.rev.length;
     const c = shell(
-      n > 1 ? `${n} sconti disponibili su ${state.domain}` : `1 sconto disponibile su ${state.domain}`,
-      'Corporate Benefits — prima di pagare, controlla.',
-      state.needLogin
+      n > 1 ? `${n} vantaggi disponibili su ${state.domain}` : `1 vantaggio disponibile su ${state.domain}`,
+      state.offers.length && state.rev.length
+        ? 'Convenzione e punti Revolut si sommano: puoi usarli insieme.'
+        : state.offers.length ? 'Corporate Benefits — prima di pagare, controlla.'
+          : 'Revolut — scegli con che carta pagare.',
+      state.needLogin && state.offers.length
     );
 
-    if (state.needLogin) {
+    for (const o of state.rev) {
+      const row = document.createElement('div');
+      row.className = 'o';
+      const pct = document.createElement('span');
+      pct.className = 'pct rev';
+      pct.textContent = o.label;
+      const box = document.createElement('div');
+      const t = document.createElement('div');
+      t.className = 't'; t.textContent = o.name;
+      const k = document.createElement('div');
+      k.className = 'k';
+      k.textContent = o.boosted
+        ? 'Revolut — paga con la carta Revolut, tasso potenziato'
+        : 'Revolut — paga con la carta Revolut';
+      box.append(t, k);
+      row.append(pct, box);
+      c.appendChild(row);
+    }
+
+    if (state.needLogin && state.offers.length) {
       const w = document.createElement('div');
       w.className = 'warn-box';
       w.innerHTML = '<b>Sessione scaduta</b>Devi fare login su Corporate Benefits per usare questi sconti.';
@@ -207,7 +233,11 @@
       link('Ricordamelo dopo', async () => { await send({ type: 'snooze', domain: state.domain }); close(); }),
       link('Mai su questo sito', async () => { await send({ type: 'mute', domain: state.domain }); close(); }),
       link('Non c\'entra nulla', async () => {
-        await send({ type: 'report', domain: state.domain, ids: state.offers.map(o => o.id) });
+        await send({
+          type: 'report', domain: state.domain,
+          ids: state.offers.map(o => o.id),
+          revKeys: state.rev.map(o => o.name_key)
+        });
         close();
       })
     );

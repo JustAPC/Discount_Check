@@ -1,0 +1,22 @@
+# Stack Dockge. MariaDB è già sul TrueNAS: qui gira solo l'API, che ci si collega.
+# Niente build: immagine node ufficiale + codice montato da ./app.
+# Il tunnel Cloudflare punta a http://<ip-nas>:8085.
+
+services:
+  sconti-api:
+    image: node:22-alpine
+    container_name: sconti-api
+    restart: unless-stopped
+    working_dir: /app
+    env_file: .env
+    volumes:
+      - ./app:/app
+    # npm install è un no-op dopo la prima volta: node_modules vive nel volume.
+    command: sh -c "npm install --omit=dev --no-audit --no-fund && node index.js"
+    ports:
+      - "8085:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 60s
+      timeout: 5s
+      retries: 3

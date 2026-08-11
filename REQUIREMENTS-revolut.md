@@ -7,31 +7,47 @@ via API sul TrueNAS.
 ## Flusso
 
 ```
-screenshot lunghi (app Revolut)
-  → cartella locale
-  → routine in chat: split in strisce (6-8 tile) → estrazione JSON
-  → POST /revolut/ingest  (Cloudflare Tunnel + bearer)
-  → delta in revolut_pending
-  → dashboard estensione: diff review → approve
+screenshot (app Revolut, anche stitchati lunghi)
+  → allegati alla chat Hermes (dashboard web, da qualunque device)
+  → skill `revolut-ingest`:
+        GET /revolut/offers      (stato attuale)
+        split in strisce (Pillow) → vision → JSON
+        nomi troncati e conflitti → una domanda sola, in blocco
+        diff mostrato in chat → Andrea approva
+        POST /revolut/ingest     (solo ciò che è stato approvato)
   → revolut_offer (stato corrente)
-  → GET /revolut/offers  (1x/giorno dall'estensione, alarm `daily` esistente)
+  → GET /revolut/offers          (1x/giorno dall'estensione, alarm `daily` esistente)
   → cache in chrome.storage.local + indice nomi
   → popup al carrello: "Revolut: 2x RevPoints"
 ```
 
-Nessun modello self-hosted, nessun OCR. Il container su TrueNAS è **solo API + MariaDB**.
-Motivo: volume massimo ~2 immagini/giorno, l'inferenza locale costerebbe più manutenzione
-di quanto rende.
+## Chi fa cosa
+
+| Attore | Responsabilità |
+|---|---|
+| Andrea | screenshot → allegato in chat Hermes → `ingest revolut` → approva il diff **nella stessa chat** |
+| **Hermes Agent** | split immagine, lettura crop (vision), diff vs stato attuale, `POST /ingest` |
+| **sconti-api** (Docker su TrueNAS) | due endpoint: legge e scrive `revolut_offer`. Non vede mai immagini, non decide nulla |
+| Estensione | `GET /offers` 1x/giorno, cache, match, popup. **Sola lettura** |
+
+Due punti fermi:
+
+- l'estrazione **non dipende dalla macchina** su cui gira l'estensione: Hermes si usa dal
+  telefono via URL;
+- la skill parla **solo HTTP**, mai il client mysql. Così è identica dal container TrueNAS
+  e dal client Hermes Desktop, anche fuori casa. Un solo code path.
 
 ## Decisioni prese
 
 | Tema | Scelta |
 |---|---|
-| Cattura | 1-2 screenshot lunghi stitchati, split lato routine in strisce da 6-8 tile |
-| Estrazione | modello in chat → JSON validato server-side. Solo `POST /ingest`, nessun endpoint immagine |
-| Mapping nome→dominio | matcher esistente (`nameKeys`/`etld1`) + alias manuali dalla dashboard |
-| Trasporto | Cloudflare Tunnel + bearer token, token in `storage.local` (mai nel repo) |
-| Review | diff review in dashboard: si approva solo il delta, le sparizioni non spengono nulla finché non confermi |
+| Cattura | 1-2 screenshot lunghi stitchati, si analizza tutto ciò che c'è nell'immagine |
+| Split | dentro Hermes, `code_execution` + Pillow, strisce da 6-8 tile |
+| Vision | il modello che Hermes usa già: `gpt-5.5` via provider `openai-codex` — nessuna chiave nuova |
+| Mapping nome→dominio | matcher esistente (`matchIds`) permissivo + alias manuali dalla dashboard |
+| Host API | `sconti-api.andreapontillo.tech` via Cloudflare Tunnel |
+| Auth | **Una sola chiave, `INGEST_TOKEN`, solo in scrittura.** Lettura pubblica: il catalogo non è sensibile e così i client non gestiscono credenziali. Niente Cloudflare Access |
+| Review | diff in chat Hermes: al server arriva solo ciò che hai approvato, quindi niente si spegne da sé |
 | Attivazione offerta | non modellata: il messaggio esce nel popup al carrello in ogni caso |
 
 ### Perché lo split è obbligatorio
@@ -39,13 +55,11 @@ Gli screenshot stitchati sono ~100 tile di altezza. Qualunque modello vision rid
 l'immagine in ingresso e i badge `2x` — piccoli e sovrapposti al logo — sono i primi
 caratteri a diventare illeggibili. Si taglia prima, si analizza dopo.
 
-### Matching conservativo (diverso da CB)
-CB è tarato per **preferire i falsi positivi**. Revolut no: un falso positivo qui consiglia
-la carta sbagliata, cioè fa perdere punti invece di farne guadagnare.
-
-Regola: match **solo** su uguaglianza esatta tra `name_key` (token normalizzati concatenati,
-es. `Wizz Air` → `wizzair`) e la label del dominio corrente, oppure su alias manuale.
-Nessun substring match. Copre i brand puliti del Marketplace; il resto si aggiunge a mano.
+### Matching permissivo, come CB
+Il falso positivo costa poco: con Revolut si paga comunque, al massimo si fanno passaggi
+in app inutili. Il falso negativo fa perdere il moltiplicatore. Quindi si riusa `matchIds`
+così com'è (dominio + nome normalizzato, substring inclusi) e si accetta il rumore. Il
+pattern `blocked` esistente serve anche qui, con chiave separata dalle offerte CB.
 
 ## Schema MariaDB
 
@@ -54,55 +68,93 @@ CREATE TABLE revolut_offer (
   id         INT AUTO_INCREMENT PRIMARY KEY,
   name       VARCHAR(120) NOT NULL,              -- "Wizz Air"
   name_key   VARCHAR(120) NOT NULL,              -- "wizzair"
-  kind       ENUM('multiplier','cashback') NOT NULL,
-  value      DECIMAL(5,2) NOT NULL,              -- 2.00 = 2x | 10.00 = 10%
-  value_raw  VARCHAR(32)  NOT NULL,              -- "2x" | "Fino a 10%"
+  kind       ENUM('points','cashback') NOT NULL DEFAULT 'points',
+  rate       DECIMAL(6,2) NOT NULL,              -- punti ogni 10 € (2, 4, 10, 20) | % se cashback
+  badge_raw  VARCHAR(48)  NOT NULL,              -- "2 per 10 €", testo esatto letto dal tile
+  boosted    TINYINT(1)   NOT NULL DEFAULT 0,    -- badge viola = tasso potenziato
   channel    ENUM('online','instore','both') NOT NULL DEFAULT 'online',
   domain     VARCHAR(190) NULL,                  -- alias manuale
   active     TINYINT(1)   NOT NULL DEFAULT 1,
   first_seen DATE NOT NULL,
   last_seen  DATE NOT NULL,
-  UNIQUE KEY uq_offer (name_key, kind, channel)
-);
-
-CREATE TABLE revolut_pending (
-  id         INT AUTO_INCREMENT PRIMARY KEY,
-  batch      CHAR(36) NOT NULL,
-  op         ENUM('add','update','remove') NOT NULL,
-  offer_id   INT NULL,
-  payload    JSON NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY k_batch (batch)
+  UNIQUE KEY uq_offer (name_key, channel)
 );
 ```
+
+Una tabella sola. Non serve una coda di approvazione: l'approvazione è già avvenuta in chat
+prima della POST.
+
+### Semantica dei badge (verificata sugli screenshot reali)
+
+Non esistono moltiplicatori `Nx`: il badge è un **tasso di accumulo**, `"N per 10 €"` —
+punti RevPoints ogni 10 € spesi. Rilevati: `2` (Wizz Air, Aer Lingus), `4` (Marketplace
+generico, Michael Kors), `10` (LEGO Store, Hugo Boss, The North Face), `20` (Nike, NordVPN,
+Levi's, Google Store).
+
+Il **colore del badge** è informazione, non decorazione: viola = tasso potenziato, grigio =
+tasso base. Va letto e salvato in `boosted`.
+
+**Come si mostra**: il numero con la `x` — `2 per 10 €` → **`2x`**, `20 per 10 €` → **`20x`**.
+L'etichetta la costruisce il server (campo `label`), i client non formattano nulla. In DB
+resta il valore numerico più il `badge_raw` originale, così se un giorno cambia la resa non
+serve rifare l'ingest.
 
 `channel = instore` viene salvato ma non servito all'estensione: scartarlo in ingest sarebbe
 irreversibile.
 
-## API (bearer obbligatorio su tutto)
+## API — `sconti-api.andreapontillo.tech`
+
+Lettura pubblica; la scrittura richiede l'header `X-Ingest-Token`. Se il token non e'
+configurato il server rifiuta di scrivere (503) invece di accettare tutto.
 
 | Metodo | Path | Body / Risposta |
 |---|---|---|
-| POST | `/revolut/ingest` | `{captured_at, complete, offers:[{name, badge, channel}]}` → `{batch, add, update, remove}` |
-| GET | `/revolut/pending` | batch aperto con le righe da approvare |
-| POST | `/revolut/pending/:batch/approve` | `{reject_ids:[…]}` → applica il resto a `revolut_offer` |
-| GET | `/revolut/offers` | `{updated_at, offers:[{name, name_key, kind, value, value_raw, domain}]}` — solo `active` e `channel != instore` |
-| POST | `/revolut/offers/:id/alias` | `{domain}` — l'alias vive server-side, non solo nel browser |
+| GET | `/revolut/offers` | `{updated_at, offers:[{id, name, name_key, kind, rate, badge_raw, boosted, channel}]}` |
+| POST | `/revolut/ingest` | `{captured_at, upsert:[{name, badge_raw, boosted, channel, domain?}], deactivate:[name_key]}` → `{upserted, deactivated, skipped}` |
 
-`complete: false` (snapshot parziale) → nessun `remove` nel delta.
+`name_key`, `kind` e `rate` li deriva il server dal testo del badge: un solo parser, non
+una regola replicata nella skill.
+
+Due endpoint, ~60 righe. Il server **esegue letteralmente** ciò che riceve: non inferisce
+le rimozioni dall'assenza nella lista. Uno snapshot parziale quindi non può cancellare
+niente — è Hermes, con te che approvi, a decidere cosa disattivare.
+
+`GET /offers` serve sia l'estensione (filtrata: solo `active`, `channel != instore`) sia
+Hermes, che la usa come stato di partenza per il diff.
+
+Gli **alias** dominio restano nell'estensione, in `storage.local`: il meccanismo esiste già
+e non c'è motivo di duplicarlo sul server.
+
+Hardening opzionale: una regola di rate limiting Cloudflare su `/revolut/ingest`. L'endpoint
+è pubblico, quindi raggiungibile dagli scanner: il codice è minimo e le query parametrizzate,
+ma una rete di sicurezza gratuita non guasta.
 
 ## Modifiche all'estensione
 
-- **`background.js`**: fetch Revolut nell'alarm `daily` già presente; cache in
-  `storage.local` (`revolut`, `ridx`); `matchRevolut(host)` con la regola exact-match;
+- **`background.js`**: fetch Revolut nell'alarm `daily` già presente, senza credenziali; cache in `storage.local` (`revolut`, `ridx`); `matchRevolut(host)`;
   fallimento del fetch = si tiene la cache, mai svuotarla.
-- **`content.js`**: sezione Revolut nell'overlay, con `value_raw` e l'indicazione di pagare
-  con Revolut. Il popup al carrello **esce anche se CB non matcha** e c'è solo Revolut.
-  CB e Revolut sono cumulabili: nessun messaggio che li presenti come alternativi.
-- **`dashboard.js`**: config endpoint + token, stato ultima sync Revolut, coda diff review,
-  gestione alias.
-- **`README.md`**: la frase "nessuna chiamata a server terzi" non è più vera. Va riscritta:
-  il catalogo Revolut arriva da un endpoint self-hosted, tutto il resto resta locale.
+- **`content.js`**: sezione Revolut nell'overlay con la `label` (`20x`). Il popup al carrello
+  **esce anche se CB non matcha** e c'è solo Revolut. CB e Revolut sono cumulabili:
+  nessun messaggio che li presenti come alternativi.
+- **`dashboard.js`**: stato ultima sync Revolut, lista offerte con gestione alias, bottone di
+  aggiornamento manuale. Nessuna coda di review (sta in Hermes) e niente configurazione:
+  l'endpoint è la costante `REVOLUT_API` in `background.js`, non ci sono segreti da inserire.
+- **`README.md`**: la frase "nessuna chiamata a server terzi" non è più vera e va riscritta.
+
+## Skill Hermes `revolut-ingest`
+
+Vive in `hermes-skill/` in questa repo e si copia a mano nel profilo Hermes come
+`skills/revolut-ingest/` (la sync automatica del profilo è stata abbandonata). Le credenziali
+stanno in `config.env` accanto a `SKILL.md`, non in variabili del container: la skill si
+porta dietro la propria configurazione. Contiene: `split_revolut.py`, le regole di lettura dei tile
+(nome, `Online`/`In negozio`, testo del badge, **colore** del badge), dedup per `name_key`,
+calcolo del diff vs `GET /offers`, presentazione del diff per l'approvazione, `POST /ingest`
+con l'header `X-Ingest-Token`.
+
+Regola di scarto: le card tagliate ai bordi dell'immagine, senza nome o senza badge
+leggibile, si ignorano e si riporta quante ne sono state scartate.
+
+È qui che vive tutta l'intelligenza del sistema. Il server è deliberatamente stupido.
 
 ## Non-goals
 
@@ -110,8 +162,45 @@ Niente scraping delle API Revolut. Niente VLM/OCR self-hosted. Niente automazion
 Niente date di scadenza (non sono negli screenshot): si usa `last_seen` + conferma manuale.
 Niente differenze per piano carta (Standard/Premium/Metal).
 
-## Da verificare prima di implementare
+## Ambiente verificato (2026-08-11)
 
-1. Tool per lo split immagine sulla macchina Windows: Python + Pillow oppure ImageMagick.
-2. Dove gira il container (stack Docker su TrueNAS), hostname del tunnel, credenziali MariaDB.
-3. Quali tab dell'app entrano nello snapshot: Marketplace intero o anche "Le tue offerte".
+- Hermes toolsets attivi: `vision`, `code_execution`, `file`, `terminal`, `web`, `cronjob`
+- Docker su TrueNAS per `sconti-api`; MariaDB `negozi_revolut` già presente
+- Python 3.11 + Pillow 12.2 anche sul PC (utile solo per test locali dello split)
+
+## Split — verificato sugli screenshot reali (2026-08-11)
+
+`split_revolut.py` taglia sulle bande uniformi lasciate dallo stitching, non a passo fisso:
+nessuna card spezzata. Misurato su `Screenshot_20260811_174533` (720×27110) → 27 strisce e
+`_174623` (720×14562) → 14 strisce, tutte 720×1080 tranne testa e coda. Passo delle bande:
+1080 px. A quella dimensione nome, badge e colore sono letti senza errori.
+
+Fallback già nel codice: se le bande non ci sono (screenshot non stitchato), taglia a passo
+fisso con `MAX_STRIP`.
+
+## Esito del primo run reale (2026-08-12)
+
+Tutte le incognite sono cadute:
+
+- il toolset `vision` di Hermes **legge i crop da disco**, non solo gli allegati della chat:
+  era il perno dell'intero flusso;
+- 41 strisce dalle due immagini, **143 tile letti**, badge e colori interpretati correttamente;
+- Pillow non è installabile a sistema (ambiente PEP 668): la skill usa un venv usa e getta
+  con `uv`. La procedura è nella skill, non va reimparata ogni volta;
+- ingest completato e scritto su MariaDB.
+
+Costo reale: qualche minuto per due immagini, quasi tutto speso nelle chiamate vision
+sequenziali (una per striscia). Il modello non è il collo di bottiglia — il numero di
+chiamate lo è. Se un giorno desse fastidio: abbassare il reasoning effort e raggruppare
+più strisce per chiamata, prima di pensare a modelli diversi.
+
+Due cose emerse dall'uso, entrambe già risolte nella skill:
+
+- **i nomi lunghi sono troncati dall'app Revolut stessa** (`Apple Store Onli…`): nessun
+  ritaglio migliore li recupera, vanno proposti e confermati mostrando il valore esatto che
+  finirebbe a DB;
+- **i duplicati non si risolvono da soli**: uno stesso negozio con due tassi può anche essere
+  un nome letto male, quindi si mostra il conflitto e decide Andrea.
+
+Resta aperto solo questo: se esistono tab con cashback in `%` (non viste negli screenshot
+finora), lo schema le regge già con `kind='cashback'`.

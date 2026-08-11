@@ -1,5 +1,7 @@
 // CB Reminder - service worker: crawl del portale, indici, matching.
 const PORTAL = 'https://almaviva.convenzioniaziendali.it';
+// Catalogo Revolut, servito da sconti-api. Sola lettura e nessun segreto: sta qui.
+const REVOLUT_API = 'https://sconti-api.andreapontillo.tech';
 const CONC = 4;            // fetch in parallelo durante il crawl
 const SAVE_EVERY = 10;     // batch tra un salvataggio e l'altro
 const SNOOZE_MS = 2 * 60 * 60 * 1000;
@@ -25,7 +27,7 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 chrome.alarms.onAlarm.addListener(a => {
-  if (a.name === 'daily') sync();
+  if (a.name === 'daily') { sync(); syncRevolut(); }
   if (a.name === 'resume') resume();
 });
 
@@ -232,6 +234,42 @@ async function rebuild(catalog) {
   await set({ idx: { dom, name } });
 }
 
+// --- Revolut ---------------------------------------------------------------
+// Seconda fonte: catalogo dei moltiplicatori RevPoints servito da sconti-api.
+// Endpoint e credenziali stanno in storage, mai nel codice: il repo resta pubblicabile.
+
+async function syncRevolut() {
+  try {
+    // Nessun header custom: niente credenziali nel browser, niente preflight CORS.
+    const r = await fetch(REVOLUT_API + '/revolut/offers');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    // Solo dati validi sovrascrivono la cache: se il NAS non risponde si tiene l'ultima lista.
+    await set({
+      revolut: { offers: data.offers || [], at: Date.now(), updatedAt: data.updated_at || null },
+      revSync: { state: 'idle', at: Date.now() }
+    });
+    await rebuildRev();
+  } catch (e) {
+    await set({ revSync: { state: 'error', error: String(e && e.message || e), at: Date.now() } });
+  }
+}
+
+// Stessa forma dell'indice CB, così matchIds() vale per entrambe le fonti.
+// Qui la "chiave" di un'offerta è il name_key, non un id numerico.
+async function rebuildRev() {
+  const { revolut = { offers: [] }, revAliases = {} } = await get(['revolut', 'revAliases']);
+  const dom = {}, name = {};
+  for (const o of revolut.offers) {
+    if (o.domain) (dom[etld1(o.domain)] ||= []).push(o.name_key);
+    for (const k of nameKeys(o.name)) (name[k] ||= []).push(o.name_key);
+  }
+  for (const [d, keys] of Object.entries(revAliases)) {
+    for (const k of keys) (dom[d] ||= []).push(k);
+  }
+  await set({ ridx: { dom, name } });
+}
+
 // --- matching --------------------------------------------------------------
 
 function matchIds(hostname, idx) {
@@ -259,14 +297,15 @@ async function handle(msg, sender) {
   const tabId = sender.tab && sender.tab.id;
 
   if (msg.type === 'check') {
-    const st = await get(['catalog', 'idx', 'blocked', 'muted', 'snooze', 'sync']);
+    const st = await get(['catalog', 'idx', 'blocked', 'muted', 'snooze', 'sync',
+      'revolut', 'ridx', 'revBlocked']);
     const catalog = st.catalog || { offers: {} };
     const idx = st.idx || { dom: {}, name: {} };
     const d = etld1(msg.host);
     const needLogin = st.sync && (st.sync.state === 'login');
     const empty = Object.keys(catalog.offers).length === 0;
 
-    if ((st.muted || []).includes(d)) return { offers: [], muted: true };
+    if ((st.muted || []).includes(d)) return { offers: [], rev: [], muted: true };
 
     const blocked = new Set((st.blocked || {})[d] || []);
     const offers = matchIds(msg.host, idx)
@@ -275,15 +314,25 @@ async function handle(msg, sender) {
       .sort((a, b) => (b.k === 'shop') - (a.k === 'shop'))
       .slice(0, 5);
 
+    const revAll = (st.revolut || {}).offers || [];
+    const revBlocked = new Set((st.revBlocked || {})[d] || []);
+    const byKey = Object.fromEntries(revAll.map(o => [o.name_key, o]));
+    const rev = [...new Set(matchIds(msg.host, st.ridx || { dom: {}, name: {} }))]
+      .filter(k => !revBlocked.has(k) && byKey[k])
+      .map(k => byKey[k])
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 3);
+
     if (tabId != null) {
       const skip = () => {};   // la tab può sparire mentre rispondiamo
-      chrome.action.setBadgeText({ tabId, text: offers.length ? String(offers.length) : '' }).catch(skip);
+      const n = offers.length + rev.length;
+      chrome.action.setBadgeText({ tabId, text: n ? String(n) : '' }).catch(skip);
       chrome.action.setBadgeBackgroundColor({ tabId, color: needLogin ? '#b45309' : '#16a34a' }).catch(skip);
     }
 
     const until = (st.snooze || {})[d] || 0;
     return {
-      offers, needLogin, empty, domain: d,
+      offers, rev, needLogin, empty, domain: d,
       snoozed: Date.now() < until,
       stale: catalog.updatedAt ? Date.now() - catalog.updatedAt > 3 * NUDGE_MS : false
     };
@@ -329,9 +378,17 @@ async function handle(msg, sender) {
   if (msg.type === 'report') {          // "questa offerta non c'entra con questo sito"
     const { blocked = {} } = await get('blocked');
     const list = new Set(blocked[msg.domain] || []);
-    msg.ids.forEach(i => list.add(i));
+    (msg.ids || []).forEach(i => list.add(i));
     blocked[msg.domain] = [...list];
     await set({ blocked });
+
+    if ((msg.revKeys || []).length) {   // stesso gesto, altra fonte
+      const { revBlocked = {} } = await get('revBlocked');
+      const rl = new Set(revBlocked[msg.domain] || []);
+      msg.revKeys.forEach(k => rl.add(k));
+      revBlocked[msg.domain] = [...rl];
+      await set({ revBlocked });
+    }
     return { ok: true };
   }
 
@@ -356,9 +413,30 @@ async function handle(msg, sender) {
 
   if (msg.type === 'sync') { sync(); return { ok: true }; }
 
+  if (msg.type === 'revSync') { await syncRevolut(); return { ok: true }; }
+
+  if (msg.type === 'revAlias') {        // collega a mano un negozio Revolut a un dominio
+    const { revAliases = {} } = await get('revAliases');
+    const d = etld1(msg.domain);
+    revAliases[d] = [...new Set([...(revAliases[d] || []), msg.key])];
+    await set({ revAliases });
+    await rebuildRev();
+    return { ok: true };
+  }
+
+  if (msg.type === 'revUnreport') {
+    const { revBlocked = {} } = await get('revBlocked');
+    revBlocked[msg.domain] = (revBlocked[msg.domain] || []).filter(k => k !== msg.key);
+    if (!revBlocked[msg.domain].length) delete revBlocked[msg.domain];
+    await set({ revBlocked });
+    return { ok: true };
+  }
+
   if (msg.type === 'state') {
-    const st = await get(['catalog', 'sync', 'blocked', 'muted', 'aliases']);
+    const st = await get(['catalog', 'sync', 'blocked', 'muted', 'aliases',
+      'revolut', 'revSync', 'revBlocked']);
     const offers = (st.catalog || {}).offers || {};
+    const revolut = st.revolut || { offers: [] };
     return {
       sync: st.sync || { state: 'idle' },
       updatedAt: (st.catalog || {}).updatedAt || 0,
@@ -368,7 +446,10 @@ async function handle(msg, sender) {
       blocked: st.blocked || {},
       muted: st.muted || [],
       aliases: st.aliases || {},
-      offers
+      offers,
+      revolut: { offers: revolut.offers || [], at: revolut.at || 0 },
+      revSync: st.revSync || { state: 'idle' },
+      revBlocked: st.revBlocked || {}
     };
   }
 

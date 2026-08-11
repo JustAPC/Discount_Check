@@ -1,0 +1,3 @@
+server/.env
+server/app/node_modules/
+hermes-skill/config.env

@@ -33,6 +33,7 @@ async function refresh() {
   $('s-dom').textContent = S.withDomain;
   $('s-gc').textContent = S.giftcards;
 
+  renderRevolut();
   search();
   renderBlocked();
   renderMuted();
@@ -47,6 +48,54 @@ function warn(title, text) {
   d.innerHTML = `<b>${title}</b> `;
   d.append(text);
   $('warn').appendChild(d);
+}
+
+// --- Revolut ---------------------------------------------------------------
+
+function renderRevolut() {
+  const rs = S.revSync || {};
+  const list = (S.revolut || {}).offers || [];
+  $('rev-sub').textContent = rs.state === 'error'
+    ? `Ultimo aggiornamento fallito: ${rs.error}`
+    : `${list.length} negozi — aggiornato ${fmt((S.revolut || {}).at)}`;
+
+  const box = $('rev-list');
+  box.innerHTML = '';
+  if (!list.length) {
+    box.innerHTML = '<div class="empty">Nessun negozio Revolut in cache.</div>';
+    return;
+  }
+  for (const o of list) {
+    const row = document.createElement('div');
+    row.className = 'item';
+    const t = document.createElement('div');
+    t.className = 't';
+    t.innerHTML = `<div>${esc(o.name)}</div><div class="m">${esc(o.domain || o.badge_raw)}${o.boosted ? ' · potenziato' : ''}</div>`;
+    const pct = document.createElement('span');
+    pct.className = 'pct rev';
+    pct.textContent = o.label;
+    row.append(t, pct, mini('collega a un sito', () => askRevDomain(row, o.name_key)));
+    box.appendChild(row);
+  }
+}
+
+function askRevDomain(afterRow, key) {
+  if (afterRow.nextElementSibling?.dataset?.alias) return;
+  const w = document.createElement('div');
+  w.className = 'item';
+  w.dataset.alias = '1';
+  const inp = document.createElement('input');
+  inp.placeholder = 'es. wizzair.com';
+  const ok = mini('salva', async () => {
+    const d = inp.value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    if (!d) return;
+    await send({ type: 'revAlias', domain: d, key });
+    w.remove();
+    refresh();
+  });
+  w.append(inp, ok);
+  afterRow.after(w);
+  inp.focus();
 }
 
 // --- ricerca + alias manuale ----------------------------------------------
@@ -142,6 +191,13 @@ function mini(txt, fn) {
 }
 
 const esc = s => String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+$('rev-sync').onclick = async () => {
+  $('rev-sync').disabled = true;
+  await send({ type: 'revSync' });
+  $('rev-sync').disabled = false;
+  refresh();
+};
 
 $('sync').onclick = async () => { await send({ type: 'sync' }); setTimeout(refresh, 300); };
 $('portal').onclick = () => send({ type: 'openPortal' });
