@@ -1,0 +1,40 @@
+name: build
+
+# Da quando l'estensione sta sul Chrome Web Store, distribuire non è più compito di
+# questo workflow: gli aggiornamenti li spinge il browser. Qui resta il pacchetto da
+# caricare sullo Store e, soprattutto, i test — che sono il motivo per cui il workflow
+# continua a esistere.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Il parsing del portale è a regex e si rompe in silenzio: se i test non passano
+      # il pacchetto non si costruisce, invece di caricarne uno che trova zero offerte.
+      - run: node test.js
+
+      - id: v
+        run: echo "v=$(jq -r .version manifest.json)" >> "$GITHUB_OUTPUT"
+
+      # Nello zip va solo ciò che Chrome carica: niente server, skill, test, docs.
+      # Lo Store rifiuta i pacchetti con file di troppo, e comunque non c'è motivo di
+      # spedire il codice del server dentro l'estensione.
+      - run: |
+          mkdir -p dist
+          zip -r dist/discount-check.zip . \
+            -x '.git/*' '.github/*' '.claude/*' 'dist/*' 'server/*' 'hermes-skill/*' \
+               '.impeccable/*' '*.md' 'test.js' '.gitignore' '.prettierrc*' 'store/*'
+
+      # Da scaricare qui e caricare sul Developer Dashboard dello Store. Non è una
+      # GitHub Release: nessuno deve più installare a mano da un link.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: discount-check-${{ steps.v.outputs.v }}
+          path: dist/discount-check.zip
+          if-no-files-found: error

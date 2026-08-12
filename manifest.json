@@ -7,8 +7,7 @@
   "host_permissions": [
     "https://*.convenzioniaziendali.it/*",
     "https://sconti-api.andreapontillo.tech/*",
-    "https://www.klarna.com/*",
-    "https://justapc.github.io/*"
+    "https://www.klarna.com/*"
   ],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "background.js" },

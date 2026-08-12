@@ -11,88 +11,17 @@ Tre fonti in una sola riga al checkout:
 
 ---
 
-## Da dove parti?
+## Installazione
 
-- **Ce l'ho già installata e devo aggiornarla** → [Aggiornare](#aggiornare)
-- **Non ce l'ho, la installo adesso** → [Prima installazione](#prima-installazione)
+### 1. Installala dal Chrome Web Store
 
----
+Apri la pagina dell'estensione sullo Store e premi **Aggiungi**. Funziona su Chrome, Brave, Edge,
+Vivaldi e gli altri browser Chromium.
 
-## Aggiornare
+Da qui in poi gli aggiornamenti li fa il browser da solo: niente zip, niente script, niente
+riavvii. Non serve la Modalità sviluppatore.
 
-Quando esce una versione nuova la dashboard te lo dice in cima, con un **`!` rosso** sull'icona.
-Non serve scaricare niente da GitHub.
-
-**1. Apri la cartella dell'estensione** — quella che hai scelto quando l'hai caricata nel browser. Se
-non ti ricordi dov'è: apri la pagina delle estensioni (`chrome://extensions` su Chrome,
-`brave://extensions` su Brave, `edge://extensions` su Edge) → **Dettagli** su Discount Check → il
-percorso è scritto sotto "Origine".
-
-**2. Doppio clic sullo script:**
-
-| Sistema | File               |
-| ------- | ------------------ |
-| macOS   | `aggiorna.command` |
-| Windows | `aggiorna.bat`     |
-
-**3. Rispondi sì al riavvio del browser.** Serve perché le estensioni non pacchettizzate vengono
-rilette dal disco solo all'avvio. Lo script riconosce da solo quale browser stai usando — Chrome,
-Brave, Edge, Vivaldi — e riavvia quello.
-
-Lo script scarica l'ultima release, fa un backup della cartella, installa sopra e verifica il
-risultato: se qualcosa va storto ripristina il backup e te lo dice. L'estensione **non viene mai
-rimossa**, quindi credenziali, catalogo, alias, segnalazioni e l'icona fissata nella barra restano
-dove sono.
-
-> **Non trovi lo script?** Hai una versione precedente alla 1.0.6. Fai un ultimo aggiornamento a
-> mano: scarica [discount-check.zip](https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip),
-> scompattalo **sopra la cartella che usi già**, poi pagina delle estensioni → **Aggiorna**. Dalla
-> prossima volta ci pensa lo script.
-
-> ⚠️ **Non usare "Rimuovi" e poi ricaricare.** Quando rimuovi un'estensione il browser cancella anche il
-> suo `chrome.storage.local`: perdi credenziali, catalogo e segnalazioni. Stessa cosa se sposti la
-> cartella: l'ID dell'estensione dipende dal percorso.
-
----
-
-## Prima installazione
-
-Cinque minuti, una volta sola.
-
-### 1. Scarica il pacchetto
-
-**macOS** — apri Terminale (⌘+Spazio → "Terminale") e incolla:
-
-```bash
-mkdir -p ~/Documents/discount-check && curl -sL -o /tmp/dc.zip https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip && unzip -oq /tmp/dc.zip -d ~/Documents/discount-check && open ~/Documents/discount-check
-```
-
-**Windows** — apri PowerShell e incolla:
-
-```powershell
-$d="$env:USERPROFILE\Documents\discount-check"; mkdir $d -Force | Out-Null; Invoke-WebRequest https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip -OutFile "$env:TEMP\dc.zip"; Expand-Archive "$env:TEMP\dc.zip" $d -Force; explorer $d
-```
-
-Scaricano e scompattano in `Documenti/discount-check`, poi aprono la cartella.
-
-> **Perché da riga di comando e non dal browser?** I file scaricati dal browser vengono marcati come
-> "provenienti da internet": al primo doppio clic sullo script di aggiornamento macOS direbbe che
-> _potrebbe contenere malware_ e Windows mostrerebbe SmartScreen. Così il problema non si pone. Se
-> preferisci comunque scaricare lo zip a mano funziona tutto uguale, ma la prima volta lo script va
-> aperto con **tasto destro → Apri** (macOS) o **Ulteriori informazioni → Esegui comunque**
-> (Windows).
-
-### 2. Caricala nel browser
-
-1. apri la pagina delle estensioni: `chrome://extensions` su Chrome, `brave://extensions` su Brave,
-   `edge://extensions` su Edge
-2. attiva **Modalità sviluppatore** (in alto a destra)
-3. **Carica estensione non pacchettizzata** → seleziona `Documenti/discount-check`
-
-Il browser carica l'estensione **da quella cartella**, non ne fa una copia: non spostarla e non
-cancellarla.
-
-### 3. Consenti l'accesso ai siti di shopping
+### 2. Consenti l'accesso ai siti di shopping
 
 Clicca l'icona dell'estensione: in cima alla dashboard trovi **"Accesso ai siti non concesso"** →
 **Consenti sui siti di shopping** → **Consenti** nella finestra del browser.
@@ -106,7 +35,7 @@ cosa serve. In pratica l'estensione non esegue codice sulle pagine che non c'ent
 controllo lo fa il service worker sul solo indirizzo del sito, e il popup viene caricato **solo**
 sulle pagine dove c'è davvero una convenzione, un moltiplicatore Revolut o un cashback Klarna.
 
-### 4. Inserisci le credenziali del portale
+### 3. Inserisci le credenziali del portale
 
 Clicca l'icona dell'estensione → **Apri dashboard** → sezione **Accesso al portale** → email e
 password del portale Corporate Benefits → **Salva**.
@@ -115,7 +44,7 @@ Sono le stesse con cui accedi al sito. Restano in `chrome.storage.local`, su que
 sono nel repo né nel pacchetto, e ogni installazione ha le sue. La dashboard non le rilegge mai — il
 campo password ti dice solo se è salvata.
 
-### 5. Primo aggiornamento del catalogo
+### 4. Primo aggiornamento del catalogo
 
 Premi **Aggiorna tutto**. Il primo crawl del portale scarica ~900 offerte e dura qualche minuto:
 puoi chiudere la dashboard, va avanti da solo. Revolut e Klarna sono immediati.
@@ -225,20 +154,23 @@ Tarato per **preferire i falsi positivi**: un promemoria di troppo si chiude, un
 
 ## Distribuzione
 
-Niente Chrome Web Store: ogni push su `main` fa girare [release.yml](.github/workflows/release.yml),
-che impacchetta `discount-check.zip` (solo i file che il browser carica) e lo pubblica su GitHub
-Releases con tag `v<version del manifest>`.
+**Chrome Web Store, visibilità "non in elenco".** Il browser aggiorna da solo: pubblicare una
+versione nuova basta a farla arrivare a tutti, di solito entro qualche ora.
 
-Il tag **è** la version di `manifest.json`. Se non la bumpi, la release esistente viene riscritta
-in silenzio e nessuno viene avvisato: bumpare `manifest.json` è il gesto che dice "questa vale la
-pena scaricarla".
+Ogni push su `main` fa girare [build.yml](.github/workflows/build.yml), che lancia i test e
+produce `discount-check.zip` come **artifact** della run — non come GitHub Release, perché nessuno
+deve più installare a mano da un link. Per pubblicare: scarichi l'artifact dalla run e lo carichi
+sul Developer Dashboard.
 
-L'estensione controlla una volta al giorno la `version` nel manifest servito da GitHub Pages
-(`justapc.github.io/Discount_Check/manifest.json`) — non l'API di GitHub, che ha 60 richieste/ora
-per IP e risponde 403 quando le esaurisci con altro. Se è più recente di quella installata: riga
-cliccabile in cima alla dashboard e **`!` rosso sul badge** dell'icona. Il badge del conteggio
-offerte ha però la precedenza sui siti convenzionati — lì il `!` non compare, perché sapere che c'è
-uno sconto vale più che sapere che c'è un aggiornamento.
+Se i test falliscono il pacchetto non si costruisce: il parsing del portale è a regex e si rompe
+in silenzio, quindi un pacchetto che trova zero offerte non deve nemmeno esistere.
+
+`manifest.json` va bumpato a ogni submission: lo Store rifiuta un pacchetto con una `version` già
+caricata.
+
+I testi della scheda, le giustificazioni dei permessi e le dichiarazioni sull'uso dei dati stanno
+in [store/listing.md](store/listing.md), così alla submission successiva non si riparte dal foglio
+bianco. L'informativa privacy è [PRIVACY.md](PRIVACY.md) ed è l'URL dichiarato allo Store.
 
 ## Struttura
 
@@ -248,8 +180,8 @@ uno sconto vale più che sapere che c'è un aggiornamento.
 | `content.js`        | rilevamento checkout + overlay (Shadow DOM)                                 |
 | `dashboard.html/js` | stato sync, ricerca catalogo, alias, segnalazioni, mute                     |
 | `test.js`           | test delle funzioni di parsing e matching (`node test.js`)                  |
-| `aggiorna.command`  | aggiornamento in place su macOS (doppio clic dalla cartella)                |
-| `aggiorna.bat/.ps1` | lo stesso su Windows                                                        |
+| `store/`            | testi e giustificazioni della scheda Chrome Web Store                       |
+| `PRIVACY.md`        | informativa privacy, dichiarata come URL allo Store                         |
 | `server/`           | `sconti-api`: il servizio che tiene il catalogo Revolut (Docker su TrueNAS) |
 | `hermes-skill/`     | skill Hermes che legge gli screenshot Revolut e riempie il catalogo         |
 

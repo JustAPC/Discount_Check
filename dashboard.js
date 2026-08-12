@@ -115,7 +115,7 @@ async function refresh() {
   $('n-blocked').textContent = blocked.length;
   $('n-muted').textContent = S.muted.length;
   renderCreds();
-  renderUpdate();
+  $('ver').textContent = 'v' + S.version;
 
   if ($('d-cb').open) renderCatalog();
   renderRevolut(rev);
@@ -431,27 +431,6 @@ function renderMuted() {
       async () => { await send({ type: 'unmute', domain: d }); refresh(); }));
     box.appendChild(row);
   }
-}
-
-// --- nuova versione -------------------------------------------------------------
-// L'estensione è distribuita a mano: qui si può solo dire che c'è, il download e il
-// ricaricamento restano all'utente.
-
-function renderUpdate() {
-  const u = S.update;
-  $('ver').textContent = 'v' + S.version;
-  $('ver').classList.toggle('old', !!u);
-  $('upd').hidden = !u;
-  if (!u) return;
-  // L'estensione non può aprire il Finder né conoscere la propria cartella su disco:
-  // l'unica cosa utile che può fare è dire il gesto esatto. Il resto sta nella guida.
-  $('upd-txt').textContent = `Versione ${u.version} disponibile — hai la ${S.version}`;
-  // Un <a href="chrome://…"> non naviga: le pagine non possono linkare quello schema.
-  // Da un'estensione però chrome.tabs.create lo apre, e non serve il permesso "tabs".
-  $('upd-ext').onclick = (e) => {
-    e.preventDefault();
-    chrome.tabs.create({ url: 'chrome://extensions' });
-  };
 }
 
 // --- credenziali del portale ---------------------------------------------------

@@ -6,12 +6,6 @@ const REVOLUT_API = "https://sconti-api.andreapontillo.tech";
 // senza chiave. Niente crawl e niente server di mezzo: la chiama il service worker.
 const KLARNA_API = "https://www.klarna.com/it/api/store-edge-rest/public/stores/directory/search/IT";
 const KLARNA_PAGE = 100; // oltre 100 per pagina l'API risponde con zero negozi
-// L'estensione si distribuisce a mano: qui si guarda se c'è una release più nuova.
-// La version si legge dal manifest servito da GitHub Pages, non dall'API: l'API ha
-// 60 richieste/ora per IP e le si esaurisce con altro, restituendo 403 in silenzio.
-const LATEST_MANIFEST = "https://justapc.github.io/Discount_Check/manifest.json";
-const RELEASES_PAGE = "https://github.com/JustAPC/Discount_Check/releases/latest";
-const BADGE_UPDATE = "#dc2626";
 const CONC = 4; // fetch in parallelo durante il crawl
 const PARSE_V = 2; // versione di parseOffer: bumpala e la sync ri-scarica tutto
 const SAVE_EVERY = 10; // batch tra un salvataggio e l'altro
@@ -40,12 +34,10 @@ chrome.runtime.onInstalled.addListener(() => {
   sync();
   syncRevolut();
   syncKlarna();
-  checkUpdate();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
   chrome.alarms.create("daily", { periodInMinutes: 1440 });
-  checkUpdate();
   // Browser chiuso a metà crawl: la coda è ancora in storage, la sveglia va rimessa
   // o quel crawl non ripartirebbe più da solo.
   const { sync: st, queue = [] } = await get(["sync", "queue"]);
@@ -57,41 +49,9 @@ chrome.alarms.onAlarm.addListener((a) => {
     sync();
     syncRevolut();
     syncKlarna();
-    checkUpdate();
   }
   if (a.name === "resume") resume();
 });
-
-// --- aggiornamenti dell'estensione -----------------------------------------
-// Distribuita a mano (zip da GitHub Releases), quindi Chrome non aggiorna nulla:
-// l'unica cosa che possiamo fare è accorgercene e dirlo.
-
-async function checkUpdate() {
-  try {
-    const r = await fetch(LATEST_MANIFEST, { cache: "no-cache" });
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const latest = String((await r.json()).version || "");
-    if (!/^\d+(\.\d+)*$/.test(latest)) return;
-    const has = newer(latest, chrome.runtime.getManifest().version);
-    await set({ update: has ? { version: latest, url: RELEASES_PAGE } : null });
-    // Badge di default: vale sulle tab dove nessun content script ha ancora parlato.
-    chrome.action.setBadgeText({ text: has ? "!" : "" });
-    if (has) chrome.action.setBadgeBackgroundColor({ color: BADGE_UPDATE });
-  } catch {
-    /* Pages non raggiungibile: si riprova al prossimo giro */
-  }
-}
-
-// "1.10.0" è più recente di "1.9.0": confronto campo per campo, non lessicografico.
-function newer(a, b) {
-  const pa = a.split(".").map(Number),
-    pb = b.split(".").map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] || 0) - (pb[i] || 0);
-    if (d) return d > 0;
-  }
-  return false;
-}
 
 // Il service worker può essere terminato a metà crawl: qui si riprende la coda.
 async function resume() {
@@ -685,15 +645,14 @@ async function visit(tabId, url) {
 function setBadge(tabId, res) {
   const skip = () => {}; // la tab può sparire mentre rispondiamo
   const n = res.muted ? 0 : res.offers.length + res.rev.length + res.kl.length;
-  // Su un sito convenzionato vince il conteggio: è il motivo per cui l'estensione
-  // esiste. Il "!" della nuova versione occupa il badge solo dove non c'è altro.
-  chrome.action.setBadgeText({ tabId, text: n ? String(n) : res.upd ? "!" : "" }).catch(skip);
-  chrome.action
-    .setBadgeBackgroundColor({
-      tabId,
-      color: n ? (res.needLogin ? "#b45309" : "#16a34a") : BADGE_UPDATE,
-    })
-    .catch(skip);
+  chrome.action.setBadgeText({ tabId, text: n ? String(n) : "" }).catch(skip);
+  // Ambra se il conteggio c'è ma la sessione al portale è scaduta: il numero è vero,
+  // per usarlo serve rifare login. Senza numero il colore non si vede: non lo tocchiamo.
+  if (n) {
+    chrome.action
+      .setBadgeBackgroundColor({ tabId, color: res.needLogin ? "#b45309" : "#16a34a" })
+      .catch(skip);
+  }
 }
 
 async function nudgeOpen() {
@@ -717,7 +676,6 @@ async function checkHost(host) {
     "klarna",
     "kidx",
     "klBlocked",
-    "update",
   ]);
   const catalog = st.catalog || { offers: {} };
   const d = etld1(host);
@@ -726,7 +684,6 @@ async function checkHost(host) {
     rev: [],
     kl: [],
     domain: d,
-    upd: !!st.update,
     needLogin: !!(st.sync && st.sync.state === "login"),
     empty: Object.keys(catalog.offers).length === 0,
   };
@@ -951,7 +908,6 @@ async function handle(msg) {
       "klSync",
       "klBlocked",
       "creds",
-      "update",
     ]);
     const offers = (st.catalog || {}).offers || {};
     const revolut = st.revolut || { offers: [] };
@@ -974,7 +930,6 @@ async function handle(msg) {
       klBlocked: st.klBlocked || {},
       // La password non esce mai da qui: la dashboard sa solo se c'è.
       creds: { email: (st.creds || {}).email || "", saved: !!(st.creds || {}).password },
-      update: st.update || null,
       version: chrome.runtime.getManifest().version,
       // Senza questo permesso l'estensione non si fa viva su nessun sito: la dashboard
       // deve poterlo dire, perché da fuori sembrerebbe solo che non trova mai niente.
