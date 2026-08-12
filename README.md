@@ -13,6 +13,11 @@ Tre fonti in una sola riga al checkout:
 
 ## Installazione
 
+> **Stato: submission allo Store in preparazione.** Finché non è approvata, il link sotto non
+> esiste ancora e chi ha l'estensione caricata a mano continua a usarla com'è — non deve fare
+> niente e non riceverà avvisi di aggiornamento. La procedura di pubblicazione è in
+> [store/listing.md](store/listing.md).
+
 ### 1. Installala dal Chrome Web Store
 
 Apri la pagina dell'estensione sullo Store e premi **Aggiungi**. Funziona su Chrome, Brave, Edge,
@@ -20,6 +25,11 @@ Vivaldi e gli altri browser Chromium.
 
 Da qui in poi gli aggiornamenti li fa il browser da solo: niente zip, niente script, niente
 riavvii. Non serve la Modalità sviluppatore.
+
+Chi ce l'ha già caricata a mano deve **installare quella dello Store e poi rimuovere la vecchia**:
+per il browser sono due estensioni diverse, con ID diversi, quindi non si aggiornano a vicenda.
+Rimuovendo la vecchia si perdono credenziali, catalogo e segnalazioni: vanno rimesse le
+credenziali e rilanciato **Aggiorna tutto**. Si paga una volta sola.
 
 ### 2. Consenti l'accesso ai siti di shopping
 
@@ -167,6 +177,13 @@ in silenzio, quindi un pacchetto che trova zero offerte non deve nemmeno esister
 
 `manifest.json` va bumpato a ogni submission: lo Store rifiuta un pacchetto con una `version` già
 caricata.
+
+Attenzione a **quando** bumparlo. Le installazioni caricate a mano leggono una volta al giorno la
+`version` dal manifest che GitHub Pages serve dalla root di `main`, e mostrano l'avviso di
+aggiornamento se è più alta della loro. Finché resta gente su installazioni manuali, alzare quella
+`version` significa mandargli un avviso che non possono soddisfare, perché le release non vengono
+più pubblicate. Per questo la prima submission parte da `1.0.9`, la stessa che vedono adesso: si
+bumpa quando la migrazione allo Store è finita.
 
 I testi della scheda, le giustificazioni dei permessi e le dichiarazioni sull'uso dei dati stanno
 in [store/listing.md](store/listing.md), così alla submission successiva non si riparte dal foglio
