@@ -6,7 +6,7 @@ description: Estrae i negozi e i moltiplicatori RevPoints dagli screenshot dell'
 # revolut-ingest
 
 Trasforma screenshot dell'app Revolut nella lista di negozi con moltiplicatore che
-l'estensione CB Reminder mostra al checkout.
+l'estensione Discount Check mostra al checkout.
 
 Non inventare mai un negozio o un valore: se un tile non è leggibile, si scarta e si dice.
 

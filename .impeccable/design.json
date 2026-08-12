@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-12T00:00:00Z",
+  "title": "Design System: Discount Check",
+  "extensions": {
+    "colorMeta": {
+      "ground": { "role": "neutral", "displayName": "Fondo freddo", "tonalRamp": ["#fbfbfc", "#0f1114"] },
+      "surface": { "role": "neutral", "displayName": "Superficie", "tonalRamp": ["#ffffff", "#16191e"] },
+      "raise": { "role": "neutral", "displayName": "Rialzo", "tonalRamp": ["#f1f3f5", "#232830"] },
+      "line": { "role": "neutral", "displayName": "Filetto", "tonalRamp": ["#e4e7ea", "#272c34"] },
+      "line-soft": { "role": "neutral", "displayName": "Filetto tenue", "tonalRamp": ["#eef0f2", "#1e232a"] },
+      "ink": { "role": "neutral", "displayName": "Inchiostro", "tonalRamp": ["#14161a", "#eceef1"] },
+      "ink-2": { "role": "neutral", "displayName": "Inchiostro secondario", "tonalRamp": ["#59626e", "#9aa4b0"] },
+      "ink-3": { "role": "neutral", "displayName": "Inchiostro terziario", "tonalRamp": ["#69727d", "#7d8794"], "note": "Minimo 4.5:1 sul fondo chiaro: 4.72:1. Non abbassare." },
+      "cb-ink": { "role": "primary", "displayName": "Verde convenzione", "tonalRamp": ["#067a52", "#34d399"] },
+      "cb-bg": { "role": "primary", "displayName": "Verde convenzione, fondo", "tonalRamp": ["#e6f5ee", "#06301f"] },
+      "rev-ink": { "role": "secondary", "displayName": "Viola RevPoints", "tonalRamp": ["#6b28d9", "#c4b5fd"] },
+      "rev-bg": { "role": "secondary", "displayName": "Viola RevPoints, fondo", "tonalRamp": ["#f0eafd", "#2e1065"] },
+      "run": { "role": "tertiary", "displayName": "Blu sync", "tonalRamp": ["#1d4ed8", "#60a5fa"] },
+      "warn-ink": { "role": "tertiary", "displayName": "Ambra login", "tonalRamp": ["#8a5106", "#fbbf24"] },
+      "warn-bg": { "role": "tertiary", "displayName": "Ambra login, fondo", "tonalRamp": ["#fdf3e2", "#2f2409"] },
+      "warn-line": { "role": "tertiary", "displayName": "Ambra login, bordo", "tonalRamp": ["#f2d9a8", "#5a4310"] },
+      "err-ink": { "role": "tertiary", "displayName": "Rosso guasto", "tonalRamp": ["#a4231a", "#fca5a5"] },
+      "err-bg": { "role": "tertiary", "displayName": "Rosso guasto, fondo", "tonalRamp": ["#fdeceb", "#3a1210"] },
+      "err-line": { "role": "tertiary", "displayName": "Rosso guasto, bordo", "tonalRamp": ["#f3c3bf", "#6d2420"] },
+      "focus": { "role": "primary", "displayName": "Fuoco", "tonalRamp": ["#2563eb", "#60a5fa"] },
+      "selection": { "role": "neutral", "displayName": "Selezione testo", "tonalRamp": ["#dbe6ff", "#1e3a8a"] }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Title", "purpose": "Nome dell'estensione e titolo della card. Uno per superficie." },
+      "body": { "displayName": "Body", "purpose": "Righe, bottoni, campo di ricerca, avvisi. Titoli di offerta a peso 550." },
+      "label": { "displayName": "Label", "purpose": "Intestazioni di sezione e gruppo, conteggi, metadati di riga, chip. Maiuscolo." }
+    },
+    "shadows": [
+      { "name": "card-floating", "value": "0 12px 32px rgba(9,12,17,.22), 0 2px 6px rgba(9,12,17,.10)", "purpose": "Solo la card iniettata al checkout, che deve staccarsi da una pagina di terzi." },
+      { "name": "control-ring", "value": "inset 0 0 0 1px var(--ink-3)", "purpose": "Hover del bottone-icona: distingue il bersaglio cliccabile dalla riga evidenziata, nei due temi." },
+      { "name": "focus-halo", "value": "0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent)", "purpose": "Campo di ricerca a fuoco, in aggiunta al bordo." },
+      { "name": "row-divider", "value": "0 -1px 0 var(--line-soft)", "purpose": "Separatore tra righe consecutive. Non sparisce in hover." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "160ms cubic-bezier(.2,.7,.3,1)", "purpose": "Ogni transizione di stato: fondo, bordo, colore, rotazione del chevron." },
+      { "name": "progress", "value": "300ms cubic-bezier(.2,.7,.3,1)", "purpose": "Barra di sincronizzazione, animata in scaleX e non in width." },
+      { "name": "ping", "value": "1.6s cubic-bezier(.2,.7,.3,1) infinite", "purpose": "Anello pulsante del pallino blu: l'unico movimento continuo, e solo mentre la sync gira." },
+      { "name": "card-in", "value": "220ms cubic-bezier(.2,.7,.3,1)", "purpose": "Entrata della card al checkout, dal basso." },
+      { "name": "reveal", "value": "180ms cubic-bezier(.2,.7,.3,1)", "purpose": "Apertura di una sezione details." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Chip fonte",
+      "kind": "chip",
+      "refersTo": "chip-cb",
+      "description": "Valore dello sconto (verde, Corporate Benefits) o del moltiplicatore (viola, Revolut). Variante neutra quando il valore non si legge come sconto.",
+      "html": "<span class=\"ds-chip\">&lt; 50%</span> <span class=\"ds-chip ds-chip--rev\">3x</span> <span class=\"ds-chip ds-chip--none\">—</span>",
+      "css": ".ds-chip { display:inline-block; font:650 11px/1.45 system-ui,sans-serif; letter-spacing:-.01em; white-space:nowrap; min-width:46px; max-width:76px; overflow:hidden; text-overflow:ellipsis; text-align:center; padding:4px 6px; border-radius:6px; color:#067a52; background:#e6f5ee; } .ds-chip--rev { color:#6b28d9; background:#f0eafd; } .ds-chip--none { color:#69727d; background:#f1f3f5; }"
+    },
+    {
+      "name": "Riga di lista",
+      "kind": "custom",
+      "refersTo": "row-item",
+      "description": "Unità base di ogni elenco: chip, titolo troncato, dettaglio, bottoni-icona. Separata dalla successiva da un filetto che non sparisce in hover.",
+      "html": "<div class=\"ds-row\"><span class=\"ds-chip\">5%</span><div class=\"ds-row__t\"><b>Zalando Gift Card</b><div class=\"ds-row__m\">zalando.it · gift card</div></div><button class=\"ds-act\" aria-label=\"Collega a un sito\"></button></div>",
+      "css": ".ds-row { display:flex; gap:9px; align-items:center; padding:8px 6px; margin:0 -6px; border-radius:8px; font:12.5px/1.45 system-ui,sans-serif; font-variant-numeric:tabular-nums; transition:background 160ms cubic-bezier(.2,.7,.3,1); } .ds-row + .ds-row { box-shadow:0 -1px 0 #eef0f2; } .ds-row:hover { background:#f1f3f5; } .ds-row__t { flex:1; min-width:0; } .ds-row__t > b { display:block; font-weight:550; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .ds-row__m { font-size:11px; color:#59626e; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .ds-act { display:flex; padding:5px; border:0; border-radius:6px; background:none; color:#69727d; cursor:pointer; } .ds-act:hover { color:#14161a; background:color-mix(in srgb,#14161a 10%,#f1f3f5); box-shadow:inset 0 0 0 1px #69727d; }"
+    },
+    {
+      "name": "Intestazione di gruppo",
+      "kind": "nav",
+      "refersTo": "label",
+      "description": "Spina dorsale dei risultati: pallino della fonte, nome, conteggio a destra, appiccicata in cima allo scorrimento.",
+      "html": "<div class=\"ds-grp\">Corporate Benefits<span class=\"ds-grp__n\">12</span></div>",
+      "css": ".ds-grp { display:flex; align-items:center; gap:7px; position:sticky; top:0; padding:12px 0 6px; background:#fbfbfc; font:600 11px/1.45 system-ui,sans-serif; letter-spacing:.06em; text-transform:uppercase; color:#59626e; border-bottom:1px solid #eef0f2; } .ds-grp::before { content:\"\"; width:6px; height:6px; border-radius:50%; background:#067a52; } .ds-grp__n { margin-left:auto; letter-spacing:0; color:#69727d; font-weight:550; }"
+    },
+    {
+      "name": "Bottone primario",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Un solo primario per superficie. L'icona ruota solo con la classe busy, mai per il solo fatto di essere disabilitato.",
+      "html": "<button class=\"ds-btn ds-btn--primary\">Aggiorna tutto</button>",
+      "css": ".ds-btn { display:inline-flex; align-items:center; gap:6px; font:550 12.5px/1 system-ui,sans-serif; padding:8px 11px; border-radius:8px; border:1px solid #e4e7ea; background:#fff; color:#14161a; cursor:pointer; transition:background 160ms cubic-bezier(.2,.7,.3,1),border-color 160ms,color 160ms; } .ds-btn:hover { background:#f1f3f5; border-color:#69727d; } .ds-btn--primary { background:#14161a; border-color:#14161a; color:#fff; } .ds-btn--primary:hover { background:#59626e; border-color:#59626e; } .ds-btn:disabled { color:#69727d; background:#f1f3f5; border-color:#e4e7ea; cursor:default; } .ds-btn:focus-visible { outline:2px solid #2563eb; outline-offset:2px; }"
+    },
+    {
+      "name": "Riquadro di stato",
+      "kind": "custom",
+      "refersTo": "warn-ink",
+      "description": "Due varianti: ambra per uno stato che l'utente può recuperare (login scaduto), rossa per un guasto (sync fallita, service worker muto). La rossa può contenere un bottone di ripristino.",
+      "html": "<div class=\"ds-note\"><b>Sessione del portale scaduta</b> Fai login sul portale e premi \"Aggiorna tutto\".</div><div class=\"ds-note ds-note--err\"><b>Estensione non raggiungibile</b> Il service worker non ha risposto.</div>",
+      "css": ".ds-note { display:flex; gap:8px; background:#fdf3e2; color:#8a5106; border:1px solid #f2d9a8; border-radius:8px; padding:9px 10px; font:12.5px/1.45 system-ui,sans-serif; } .ds-note b { font-weight:600; } .ds-note--err { background:#fdeceb; color:#a4231a; border-color:#f3c3bf; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Lo strumento affilato",
+    "overview": "Discount Check si apre per pochi secondi: dice lo stato di un catalogo e risponde a una domanda, poi sparisce. Il sistema è costruito su una sola unità, la riga separata da filetti da 1px, senza card annidate e senza griglie di tessere statistiche. Il colore non decora: ogni tinta ha esattamente un significato e ricorre identica sul popup della toolbar e sulla card iniettata al checkout, perché verde e viola dicono da quale delle due fonti arriva il vantaggio e le due si usano in modo diverso.",
+    "keyCharacteristics": [
+      "Riga + filetto come unica struttura di lista",
+      "Tre gradi tipografici, font di sistema, cifre tabulari",
+      "Colore solo semantico: cinque tinte, cinque significati",
+      "Un solo contenitore scorrevole per superficie",
+      "Lo stato del catalogo non si nasconde mai"
+    ],
+    "rules": [
+      "Un colore, un significato: verde = Corporate Benefits, viola = Revolut, blu = sync, ambra = login scaduto, rosso = guasto. Mai il colore da solo a portare l'informazione.",
+      "Il chip onesto: nel chip colorato solo ciò che si legge come sconto; il resto scende nel dettaglio e il chip diventa neutro.",
+      "Un solo scorrimento per superficie: niente liste con max-height dentro una pagina che già scorre.",
+      "Tre gradi di testo (11 / 12.5 / 14.5): rank ulteriori si fanno con il peso e con ink-2 / ink-3.",
+      "Il bordo e basta: bordo o ombra, mai i due insieme, tranne la card di checkout che atterra su pagine ignote."
+    ],
+    "notCanonized": "La segnalazione flat-type-hierarchy che il detector continua a emettere non è una regola del sistema ma una deviazione motivata: la banda 1.125–1.2 di reference/operate.md governa le UI di prodotto e il floor generico da 1.25 per gradino porterebbe il titolo a 17px dentro un popup da 400px."
+  }
+}
