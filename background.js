@@ -413,6 +413,9 @@ async function handle(msg, sender) {
 
   if (msg.type === 'sync') { sync(); return { ok: true }; }
 
+  // Le due fonti sono indipendenti: partono insieme, il crawl CB è lento e Revolut no.
+  if (msg.type === 'syncAll') { sync(); syncRevolut(); return { ok: true }; }
+
   if (msg.type === 'revSync') { await syncRevolut(); return { ok: true }; }
 
   if (msg.type === 'revAlias') {        // collega a mano un negozio Revolut a un dominio

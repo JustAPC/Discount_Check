@@ -8,13 +8,15 @@ Portale: `almaviva.convenzioniaziendali.it`.
 1. Chrome → `chrome://extensions` → attiva **Modalità sviluppatore**
 2. **Carica estensione non pacchettizzata** → seleziona questa cartella
 3. Fai login sul portale in una tab
-4. Apri l'estensione → **Aggiorna ora** (primo crawl: ~900 offerte, qualche minuto)
+4. Apri l'estensione → **Aggiorna tutto** (primo crawl: ~900 offerte, qualche minuto)
 
 ## Come funziona
 
 - **Badge** sull'icona appena il dominio del sito corrente risulta convenzionato
 - **Popup** solo in fase di checkout (URL tipo `/cart`, `/checkout`, `/carrello`… o bottoni "procedi al pagamento", "completa l'ordine"…)
-- **Sync** automatica ogni 24h (`chrome.alarms`) + bottone manuale
+- **Sync** automatica ogni 24h (`chrome.alarms`) di entrambe le fonti + **Aggiorna tutto** in
+  dashboard; "Aggiorna Revolut" da solo evita il crawl lungo del portale quando serve solo il
+  catalogo punti
 - Per Corporate Benefits nessuna credenziale salvata: il crawl riusa la sessione già attiva nel browser, tutto resta in `chrome.storage.local`
 
 ## Seconda fonte: Revolut
@@ -30,8 +32,6 @@ Nessuna configurazione e nessuna credenziale: l'endpoint sta in `REVOLUT_API` in
 `background.js`. L'estensione legge soltanto, e quali negozi diano punti non è un dato
 sensibile — l'unica chiave del sistema (`INGEST_TOKEN`) protegge la scrittura e vive solo
 sul server e nella skill Hermes.
-
-Se il server non è raggiungibile la sezione Revolut resta vuota e il resto funziona come prima.
 
 Se il server non risponde, l'ultima lista scaricata resta valida: il match continua a
 funzionare offline.

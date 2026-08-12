@@ -84,6 +84,24 @@ Altre regole:
   decide Andrea quale tenere. Un duplicato può anche voler dire che si è letto male un nome,
   quindi nasconderlo con una regola automatica nasconde un errore.
 
+### 3-bis. Controllo dei valori letti
+
+Il badge è la parte che si sbaglia più facilmente: due cifre piccole su uno sfondo colorato.
+Due controlli, entrambi a costo zero, prima di portare qualcosa al passo 4.
+
+**Tassi mai visti.** Confronta i valori letti con quelli già presenti nella risposta del
+passo 1. Revolut usa un insieme discreto e ricorrente di tassi (tipicamente 2, 3, 4, 5, 6, 7,
+8, 10, 11, 12, 13, 14, 15, 20). Un valore che **non compare in nessuna offerta esistente** è
+quasi sempre una lettura sbagliata: rileggi quella striscia prima di proporlo, e se dopo la
+rilettura resta, portalo al passo 4 come voce da confermare, mai scriverlo in silenzio.
+
+**Salti grossi.** Un negozio già a catalogo che passa da `4x` a `9x` è più probabilmente un
+errore di lettura che un cambio di offerta. Va in `CAMBIATI` con il valore vecchio accanto,
+così la differenza si vede.
+
+Se una striscia produce un valore dubbio, rileggerla **da sola** costa una chiamata: falla,
+invece di tirare a indovinare.
+
 ### 4. Nomi troncati e conflitti
 
 Una domanda sola, in blocco, con **due tabelle**. Vale una regola sopra tutte:
@@ -175,3 +193,9 @@ non è vuoto elencare i nomi: significa che il badge non è stato interpretato.
   poi `/tmp/revolut-ingest-venv/bin/python split_revolut.py …`.
 - Le domande ad Andrea costano molto tempo: farne **una sola**, in blocco, al passo 4, e una
   di conferma finale al passo 5. Mai una domanda per singola card.
+- **Non abbassare il reasoning effort per andare più veloce.** Con effort basso i badge
+  vengono letti male in modo silenzioso: nel run del 12/08/2026 sono comparsi valori `9x`
+  inesistenti (Samsung letto 9x invece di 4x, Ralph Lauren 9x invece di 5x) che a effort alto
+  non si erano presentati. Qui un errore non si vede: entra a catalogo e ci resta.
+- Il tempo di questo lavoro sta nelle chiamate vision, una per striscia — non nel modello.
+  Se serve accorciarlo, raggruppa più strisce per chiamata invece di sacrificare l'accuratezza.

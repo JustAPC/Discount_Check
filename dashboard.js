@@ -21,13 +21,13 @@ async function refresh() {
     : `Ultimo aggiornamento: ${fmt(S.updatedAt)}`;
 
   $('warn').innerHTML = '';
-  if (st.state === 'login') warn('Sessione scaduta', 'Fai login sul portale, poi premi "Aggiorna ora". Il catalogo salvato resta attivo ma può essere incompleto.');
+  if (st.state === 'login') warn('Sessione scaduta', 'Fai login sul portale, poi premi "Aggiorna tutto". Il catalogo salvato resta attivo ma può essere incompleto.');
   else if (st.state === 'error') warn('Sincronizzazione fallita', st.error || 'errore sconosciuto');
 
   $('bar').hidden = !running;
   if (running) $('bar').firstElementChild.style.width = `${Math.round(100 * (st.done || 0) / Math.max(st.total || 1, 1))}%`;
   $('sync').disabled = running;
-  $('sync').textContent = running ? 'In corso…' : 'Aggiorna ora';
+  $('sync').textContent = running ? 'In corso…' : 'Aggiorna tutto';
 
   $('s-count').textContent = S.count;
   $('s-dom').textContent = S.withDomain;
@@ -199,7 +199,7 @@ $('rev-sync').onclick = async () => {
   refresh();
 };
 
-$('sync').onclick = async () => { await send({ type: 'sync' }); setTimeout(refresh, 300); };
+$('sync').onclick = async () => { await send({ type: 'syncAll' }); setTimeout(refresh, 300); };
 $('portal').onclick = () => send({ type: 'openPortal' });
 $('q').oninput = () => S && search();
 
