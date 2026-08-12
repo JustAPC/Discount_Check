@@ -29,7 +29,7 @@ jobs:
           mkdir -p dist
           zip -r dist/discount-check.zip . \
             -x '.git/*' '.github/*' '.claude/*' 'dist/*' 'server/*' 'hermes-skill/*' \
-               '.impeccable/*' '*.md' 'test.js' '.gitignore' '.prettierrc*' 'store/*'
+               '.impeccable/*' '*.md' 'test.js' '.gitignore' '.prettierrc*' 'store/*' '*.DS_Store'
 
       # Da scaricare qui e caricare sul Developer Dashboard dello Store. Non è una
       # GitHub Release: nessuno deve più installare a mano da un link.

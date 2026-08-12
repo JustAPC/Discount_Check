@@ -1,3 +1,5 @@
 server/.env
 server/app/node_modules/
 hermes-skill/config.env
+# Finder li semina in ogni cartella e finivano dentro il pacchetto dello Store.
+.DS_Store
