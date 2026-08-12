@@ -1,3 +1,5 @@
 server/.env
 server/app/node_modules/
 hermes-skill/config.env
+# La chiave privata che fissa l'ID dell'estensione: sta fuori dal repo.
+*.pem
