@@ -453,13 +453,27 @@ function etld1(hostname) {
   return MULTI_SLD.test(h) ? p.slice(-3).join(".") : two;
 }
 
+// Il "nome" del dominio: ita-airways.com → itaairways. Un dominio conosciuto vale anche
+// sulle altre estensioni dello stesso marchio — chi sa che Nike è nike.com non deve poi
+// elencare a mano nike.it e nike.co.uk.
+const domLabel = (hostname) => etld1(hostname).split(".")[0].replace(/-/g, "");
+
 async function rebuild(catalog) {
   const { aliases = {} } = await get("aliases");
   const dom = {},
+    lab = {},
     name = {},
     word = {};
   for (const [id, o] of Object.entries(catalog.offers)) {
-    if (o.k === "shop" && o.h) (dom[etld1(o.h)] ||= []).push(id);
+    if (o.k === "shop" && o.h) {
+      (dom[etld1(o.h)] ||= []).push(id);
+      (lab[domLabel(o.h)] ||= []).push(id);
+    }
+    // Qui il nome resta indicizzato anche quando un link c'è, al contrario di Revolut e
+    // Klarna: il link del portale non è sempre il sito del negozio. Circa un'offerta su
+    // cinque punta a un portale convenzione dedicato (convenzionipiaggio.com,
+    // iltuoticket.it) e una su dieci al gift card shop. Fidarsi di quel dominio come se
+    // fosse il negozio spegnerebbe il match sul marchio proprio dove serve.
     for (const k of nameKeys(o.t)) (name[k] ||= []).push(id);
     for (const k of wordKeys(o.t)) (word[k] ||= []).push(id);
   }
@@ -470,7 +484,7 @@ async function rebuild(catalog) {
   for (const [d, ids] of Object.entries(aliases)) {
     for (const id of ids) if (catalog.offers[id]) (dom[d] ||= []).push(id);
   }
-  await set({ idx: { dom, name, word } });
+  await set({ idx: { dom, lab, name, word } });
 }
 
 // --- Revolut ---------------------------------------------------------------
@@ -497,22 +511,50 @@ async function syncRevolut() {
   }
 }
 
-// Stessa forma dell'indice CB, così matchIds() vale per entrambe le fonti.
-// Qui la "chiave" di un'offerta è il name_key, non un id numerico.
-async function rebuildRev() {
-  const { revolut = { offers: [] }, revAliases = {} } = await get(["revolut", "revAliases"]);
+// Stessa forma dell'indice CB, così matchIds() vale per tutte le fonti. Qui la "chiave"
+// di un'offerta è il name_key, non un id numerico.
+//
+// Revolut e Klarna condividono anche la regola, e per un motivo che il portale non ha: il
+// loro dominio è davvero quello del negozio — curato a mano per Revolut, letto da
+// merchantUrl per Klarna. Quindi quando c'è **sostituisce** la congettura sul nome invece
+// di affiancarla, e il negozio esce dagli indici sui nomi. È così che "Qatar Airways"
+// smette di poter comparire su ita-airways.com: non per una regola più stretta, ma perché
+// di quel negozio si sa il sito e non serve più indovinarlo.
+//
+// Di conseguenza l'alias locale per quel negozio non serve più, e va cancellato: se
+// restasse, continuerebbe a sovrascrivere per sempre il dato buono appena arrivato.
+function storeIndex(offers, aliases) {
   const dom = {},
+    lab = {},
     name = {},
     word = {};
-  for (const o of revolut.offers) {
-    if (o.domain) (dom[etld1(o.domain)] ||= []).push(o.name_key);
+  const known = new Set();
+  for (const o of offers) {
+    if (o.domain) {
+      known.add(o.name_key);
+      (dom[etld1(o.domain)] ||= []).push(o.name_key);
+      (lab[domLabel(o.domain)] ||= []).push(o.name_key);
+      continue;
+    }
     for (const k of nameKeys(o.name)) (name[k] ||= []).push(o.name_key);
     for (const k of wordKeys(o.name)) (word[k] ||= []).push(o.name_key);
   }
-  for (const [d, keys] of Object.entries(revAliases)) {
-    for (const k of keys) (dom[d] ||= []).push(k);
+  const kept = {};
+  for (const [d, keys] of Object.entries(aliases)) {
+    const live = keys.filter((k) => !known.has(k));
+    if (live.length) kept[d] = live;
+    for (const k of live) (dom[d] ||= []).push(k);
   }
-  await set({ ridx: { dom, name, word } });
+  return { idx: { dom, lab, name, word }, aliases: kept };
+}
+
+async function rebuildRev() {
+  const { revolut = { offers: [] }, revAliases = {} } = await get(["revolut", "revAliases"]);
+  const r = storeIndex(revolut.offers || [], revAliases);
+  await set({ ridx: r.idx });
+  if (JSON.stringify(r.aliases) !== JSON.stringify(revAliases)) {
+    await set({ revAliases: r.aliases });
+  }
 }
 
 // --- Klarna ----------------------------------------------------------------
@@ -590,27 +632,24 @@ async function syncKlarna() {
 
 async function rebuildKl() {
   const { klarna = { offers: [] }, klAliases = {} } = await get(["klarna", "klAliases"]);
-  const dom = {},
-    name = {},
-    word = {};
-  for (const o of klarna.offers) {
-    if (o.domain) (dom[etld1(o.domain)] ||= []).push(o.name_key);
-    for (const k of nameKeys(o.name)) (name[k] ||= []).push(o.name_key);
-    for (const k of wordKeys(o.name)) (word[k] ||= []).push(o.name_key);
+  const r = storeIndex(klarna.offers || [], klAliases);
+  await set({ kidx: r.idx });
+  if (JSON.stringify(r.aliases) !== JSON.stringify(klAliases)) {
+    await set({ klAliases: r.aliases });
   }
-  for (const [d, keys] of Object.entries(klAliases)) {
-    for (const k of keys) (dom[d] ||= []).push(k);
-  }
-  await set({ kidx: { dom, name, word } });
 }
 
 // --- matching --------------------------------------------------------------
 
 function matchIds(hostname, idx) {
   const d = etld1(hostname);
-  const label = d.split(".")[0].replace(/-/g, "");
+  const label = domLabel(hostname);
   const clean = label.replace(/^(shop|store|my|www)/, "").replace(/(shop|store|online|italia|it)$/, "");
   const ids = new Set(idx.dom[d] || []);
+
+  // Stesso marchio, altra estensione: nike.com conosciuto aggancia anche nike.it. È un
+  // confronto esatto fra nomi di dominio, quindi due letture dirette e nessuna scansione.
+  for (const k of [label, clean]) for (const id of (idx.lab || {})[k] || []) ids.add(id);
 
   for (const [k, list] of Object.entries(idx.name)) {
     const hit =

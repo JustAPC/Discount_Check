@@ -152,13 +152,34 @@ Il cashback Klarna **non scatta pagando sul sito**: si sblocca comprando dentro 
 Perciò la riga nel popup è un promemoria senza bottone, e il chip dice "fino a X%" quando Klarna
 dichiara un tetto (`showUpToPrefix`), che è quasi sempre.
 
-### Matching a 3 livelli
+### Matching
 
-1. **Alias manuale** (dashboard → "collega a un sito") — vince sempre
-2. **Dominio** estratto dal link uscente dell'offerta
-3. **Nome brand** normalizzato vs dominio corrente — l'unico che copre gift card e portali dedicati
+Dal più affidabile al più euristico:
 
-Tarato per **preferire i falsi positivi**: un promemoria di troppo si chiude, uno sconto perso no.
+1. **Alias manuale** (dashboard → "collega a un sito") — vince sempre, vale solo su questo computer
+2. **Dominio esatto** dell'offerta
+3. **Nome del dominio**, senza suffisso: un `nike.com` conosciuto aggancia anche `nike.it`
+4. **Nome del negozio** appiccicato (`thespacecinema`), come sottostringa nei due versi
+5. **Una parola sola** del nome, da 7 caratteri in su, **solo se il dominio ci comincia**
+
+Il livello 5 è severo apposta. I marchi costruiscono il dominio col nome davanti e il
+settore dietro, quindi `mondadori` è un prefisso di `mondadoristore` mentre `airways` è solo
+un suffisso di `itaairways`: senza la regola del prefisso, "Qatar Airways" compariva su
+`ita-airways.com`.
+
+**Per Revolut e Klarna il dominio sostituisce i livelli 4 e 5**, non li affianca: quando si
+sa dov'è il negozio non c'è niente da indovinare. Vale solo per quelle due fonti perché il
+loro dominio è davvero del negozio — curato a mano per Revolut, letto da `merchantUrl` per
+Klarna. Il link del portale no: un'offerta su cinque punta a un portale convenzione dedicato,
+quindi lì il nome resta indicizzato anche quando un link c'è.
+
+Ne segue che **curare un dominio su `sconti-api` è più efficace che stringere una regola**:
+toglie quel negozio dalla zona a indovinelli senza togliere niente agli altri. E l'alias
+locale per un negozio che ha ottenuto un dominio dal server viene cancellato al primo
+aggiornamento, o resterebbe a sovrascrivere per sempre il dato buono appena arrivato.
+
+Dove si indovina ancora, il matching è tarato per **preferire i falsi positivi**: un
+promemoria di troppo si chiude, uno sconto perso no.
 
 ---
 

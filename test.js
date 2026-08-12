@@ -27,7 +27,7 @@ const ctx = {
   }
 };
 vm.createContext(ctx);
-vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild, collapsed, wordKeys };', ctx);
+vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild, collapsed, wordKeys, storeIndex, domLabel };', ctx);
 const T = ctx.__T;
 
 let fail = 0;
@@ -172,6 +172,43 @@ eq('collapsed: calo fisiologico', T.collapsed(870, 890, 0), false);
 eq('collapsed: esattamente la metà non è un crollo', T.collapsed(445, 890, 0), false);
 eq('collapsed: primo crawl, niente da confrontare', T.collapsed(0, 0, 0), false);
 eq('collapsed: catalogo piccolo, può dimezzarsi davvero', T.collapsed(4, 30, 0), false);
+
+// --- storeIndex: il dominio noto sostituisce la congettura sul nome ---------
+// Vale per Revolut e Klarna, dove il dominio e' davvero quello del negozio. Il portale
+// no: un link su cinque punta a un portale convenzione, non al sito del brand.
+
+eq('domLabel: via i trattini e il suffisso', T.domLabel('www.ita-airways.com'), 'itaairways');
+
+const revOffers = [
+  { name: 'ITA airways', name_key: 'itaairways', domain: 'ita-airways.com' },
+  { name: 'Qatar Airways', name_key: 'qatarairways', domain: 'qatarairways.com' },
+  { name: 'Lounge by Zalando', name_key: 'loungebyzalando', domain: null }
+];
+const ri = T.storeIndex(revOffers, {}).idx;
+const rm = h => T.matchIds(h, ri);
+
+// ITA e Qatar non compaiono negli indici sui nomi: di loro si sa il sito. Il terzo si',
+// ed e' giusto - "zalando" da "Lounge by Zalando" e' cio' che lo aggancia a zalando.it
+// finche' nessuno gli cura un dominio.
+eq('storeIndex: con dominio esce dagli indici sui nomi',
+  [Object.keys(ri.name), Object.keys(ri.word)], [['loungebyzalando'], ['zalando']]);
+eq('storeIndex: con dominio entra in quelli sul dominio',
+  [Object.keys(ri.dom).sort(), Object.keys(ri.lab).sort()],
+  [['ita-airways.com', 'qatarairways.com'], ['itaairways', 'qatarairways']]);
+eq('match: ita-airways.com solo ITA', rm('www.ita-airways.com'), ['itaairways']);
+eq('match: qatarairways.com solo Qatar', rm('www.qatarairways.com'), ['qatarairways']);
+// Il dominio noto vale anche sulle altre estensioni dello stesso marchio.
+eq('match: ita-airways.it vale lo stesso', rm('ita-airways.it'), ['itaairways']);
+// Senza dominio resta la congettura sul nome, che e' meglio di niente.
+eq('match: il negozio senza dominio resta sul nome', rm('loungebyzalando.com'), ['loungebyzalando']);
+
+// L'alias locale muore quando il server impara il dominio, o sovrascriverebbe per sempre
+// il dato buono appena arrivato.
+const conAlias = T.storeIndex(revOffers, { 'qatarairways.it': ['qatarairways'], 'x.it': ['loungebyzalando'] });
+eq('storeIndex: alias superato dal dominio, cancellato',
+  conAlias.aliases, { 'x.it': ['loungebyzalando'] });
+eq('storeIndex: alias ancora utile, tenuto',
+  T.matchIds('x.it', conAlias.idx), ['loungebyzalando']);
 
 // --- checkHost: da qui dipende se il content script viene iniettato ---------
 // Prima girava su ogni pagina e decideva lui; ora un errore qui è un'estensione muta
