@@ -102,69 +102,100 @@ così la differenza si vede.
 Se una striscia produce un valore dubbio, rileggerla **da sola** costa una chiamata: falla,
 invece di tirare a indovinare.
 
-### 4. Nomi troncati e conflitti
+### 4. La scheda di revisione
 
-Una domanda sola, in blocco, con **due tabelle**. Vale una regola sopra tutte:
+Una risposta sola, con **due tabelle a larghezza fissa**. Andrea le copia, le marca in un
+editor e le rimanda indietro: e' l'unico momento in cui decide, quindi deve poterlo fare riga
+per riga invece che con un "ok" globale.
+
+Vale una regola sopra tutte:
 
 > **Mai chiedere una conferma senza mostrare il valore esatto che finirebbe nel database.**
-> "Confermi i completamenti più plausibili?" è una domanda inutile: Andrea non può rispondere
-> se non vede cosa stai per scrivere.
+> "Confermi i completamenti piu' plausibili?" e' una domanda inutile: Andrea non puo'
+> rispondere se non vede cosa stai per scrivere.
 
-Quindi, per ogni nome troncato, **sempre tre colonne**: quello che si legge, quello che si
-salverebbe come `name`, e il dominio associato se lo si sa.
+#### Chi finisce nella prima tabella
 
-```
-NOMI TRONCATI — questi finirebbero a DB così
- #  letto sulla card      name da salvare          dominio           valore
- 1  Corriere dello S…     Corriere dello Sport     corrieredellosport.it   10x
- 2  Apple Store Onli…     Apple Store Online       apple.com                4x
- 3  Lounge by Zala…       Lounge by Zalando ?      zalando.it               2x
- 4  The British Cou…      The British Council ?    britishcouncil.org       6x
+Un negozio si propone per la disattivazione **solo se e' assente da due letture di fila**.
+La discriminante e' `last_seen` confrontato con la data dell'ultimo ingest, che e' il
+`updated_at` restituito dal passo 1:
 
-CONFLITTI — stesso negozio, valori diversi
- 5  dott 10x (viola)  vs  Dott 2x (grigio)     → quale tengo?
+| Situazione | Significato | Cosa fare |
+|---|---|---|
+| compare, con qualunque tasso | vivo, magari cambiato | va in **tabella 2**, mai disattivato |
+| non compare, ma `last_seen` == ultimo ingest | c'era l'ultima volta: **probabilmente non l'hai letto** | una riga di nota, **non proporlo** |
+| non compare, e `last_seen` < ultimo ingest | assente due volte: **sparito** | va in **tabella 1** |
 
-Correggi con: "2 = Apple Store", "3 dominio zalando.it", "4 scarta", "5 tieni 10x".
-Rispondi "ok" per accettare tutto come sopra.
-```
+Un cambio di tasso non e' mai una sparizione, e una singola lettura andata male non puo'
+togliere niente dal catalogo.
 
-Regole:
-
-- il `?` marca le proposte su cui non sei sicuro: è lì che Andrea guarda per primo;
-- il **dominio** è la colonna che conta davvero, perché è ciò che aggancia il negozio al sito
-  su cui sta comprando. Se non lo sai, lascia la cella vuota invece di inventare;
-- **un dominio già a catalogo non si tocca e non si ripropone.** Lo stato del passo 1 lo
-  contiene: prima di scrivere qualcosa in quella colonna, guardalo. Se il negozio ce l'ha
-  già, scrivilo come `= dominio` per far vedere che resta com'è. Se quello che avresti
-  proposto è **diverso** da quello salvato, non sceglierlo tu: portalo come discrepanza,
-  perché il dominio salvato è una decisione presa guardando il sito vero, mentre il tuo è
-  una deduzione dal nome. Il server comunque rifiuta di sovrascriverlo — l'ingest può solo
-  riempire un vuoto — quindi proporlo senza dirlo produrrebbe solo un "ok" che non fa
-  niente, e la sensazione sbagliata di aver corretto qualcosa;
-- se una card resta ambigua dopo la risposta, si scarta: meglio un negozio in meno che una
-  riga sbagliata in un catalogo che consiglia la carta al checkout.
-
-### 5. Diff e approvazione
-
-Confrontare con lo stato del passo 1 e mostrare ad Andrea **solo ciò che cambia**:
+#### Come si presenta
 
 ```
-NUOVI       Nike 20x · NordVPN 20x
-CAMBIATI    LEGO Store 4x → 10x
-SPARITI     Zalando 4x        ← erano attivi, non compaiono negli screenshot
-UNIFICATI   dott 10x + Dott 2x → dott 10x
-SCARTATI    3 tile illeggibili
+DISATTIVAZIONI — non ne avviene nessuna se non la marchi tu
+scrivi  [x]  per disattivare, lascia  [ ]  per lasciare attivo
+
+     negozio                      aveva   assente da   dominio curato
+     -------------------------------------------------------------------
+[ ]  Corsica Ferries              5x      2 letture    corsicaferries.it
+[ ]  Busch Gardens                4x      3 letture    —
+
+non lette stavolta, ma c'erano all'ingest precedente — non tocco niente:
+Booking, Dolce & Gabbana, Stanley 1913
+
+
+DA SCRIVERE — si applicano tutte, tranne quelle che salti
+scrivi  [-]  per saltare la riga; il dominio mettilo nell'ultima colonna
+
+     negozio                      valore  cosa cambia   dominio
+     -------------------------------------------------------------------
+[ ]  Nike                         20x     nuovo         .
+[ ]  Corriere dello Sport         10x     nuovo         .
+[ ]  LEGO Store                   10x     era 4x        .
+[ ]  Apple Store Onli…            4x      nome troncato .
 ```
 
-I valori si mostrano come moltiplicatore: `20 per 10 €` → **`20x`**. Con molti negozi nuovi,
-raggrupparli per valore invece di elencarli tutti riga per riga.
+Regole di composizione:
 
-Poi **fermarsi e chiedere conferma**. Uno screenshot parziale fa sparire negozi che sono
-ancora vivi: è Andrea a decidere cosa disattivare, mai la skill.
+- **larghezza fissa con spazi**, mai pipe di markdown: Andrea la edita in un editor qualunque
+  e la reincolla in chat, dove le colonne allineate restano leggibili e le pipe no;
+- il marcatore sta **all'inizio della riga**, che e' il punto piu' facile da raggiungere;
+- il punto `.` nella colonna dominio e' un segnaposto da sovrascrivere: una cella vuota non
+  si vede;
+- un nome troncato dall'app (`Apple Store Onli…`) si porta cosi' com'e' letto, con
+  `nome troncato` nella colonna "cosa cambia": e' Andrea a completarlo scrivendolo di fianco;
+- **stesso negozio con tassi diversi** (es. `dott` 10x viola e `Dott` 2x grigio): una riga
+  sola con `conflitto: 10x o 2x?` nella colonna "cosa cambia". Non decidere mai da solo — un
+  duplicato puo' anche voler dire che si e' letto male un nome, e nasconderlo con una regola
+  automatica nasconde un errore;
+- se una tabella e' vuota, scrivere `nessuna` invece di omettere la sezione: "non ci sono
+  disattivazioni" e "me ne sono dimenticato" non devono avere lo stesso aspetto.
+
+### 5. Interpretare la risposta
+
+Andrea rimanda indietro la scheda, marcata come gli e' comodo. **Interpreta cosa intende, non
+pretendere la sintassi**: puo' scrivere `x`, `si`, `disattiva`, puo' correggere un nome
+scrivendolo di fianco, puo' aggiungere una nota a parole. La sintassi proposta e' un aiuto,
+non un contratto.
+
+I default sono asimmetrici, ed e' voluto:
+
+- **una riga non marcata in tabella 1 non disattiva niente.** Aggiungere un negozio sbagliato
+  si vede e si disfa; spegnerne uno vivo e' silenzioso, e ce ne si accorge settimane dopo;
+- **una riga non marcata in tabella 2 si scrive.** E' il caso normale e non ha senso chiedere
+  trenta conferme per trenta negozi nuovi.
+
+Se una riga resta **ambigua** dopo la risposta — non si capisce se il segno vuol dire una cosa
+o l'altra — non indovinare: saltala, e dillo fra i risultati. Su un'azione distruttiva
+l'incertezza non si risolve tirando a indovinare.
+
+Non serve una seconda conferma: scrivi, e poi riporta esattamente cosa hai scritto.
 
 ### 6. Scrittura
 
-Solo dopo l'ok, e solo con ciò che è stato approvato:
+Solo dopo la scheda rimandata indietro, e solo con ciò che ne risulta. In particolare
+`deactivate` contiene **soltanto le righe marcate a mano**: se Andrea non ha marcato niente,
+`deactivate` è un array vuoto, non l'elenco degli assenti.
 
 ```bash
 curl -s -X POST "$SCONTI_API/revolut/ingest" \
@@ -184,8 +215,19 @@ curl -s -X POST "$SCONTI_API/revolut/ingest" \
 
 `deactivate` prende i `name_key` restituiti da `GET /offers`, non i nomi.
 
-Il server risponde `{upserted, deactivated, skipped}`. Riportare i numeri, e se `skipped`
-non è vuoto elencare i nomi: significa che il badge non è stato interpretato.
+Il server risponde `{upserted, deactivated, skipped}`. Il resoconto ad Andrea non sono i
+numeri del server ma **cosa è successo a ciò che aveva marcato**, in quattro righe:
+
+```
+scritti        Nike 20x, Corriere dello Sport 10x, LEGO Store 4x → 10x
+domini         corrieredellosport.it su Corriere dello Sport
+disattivati    Corsica Ferries
+saltati        Apple Store Onli… (nome ambiguo, non ho capito la correzione)
+```
+
+`skipped` dal server è un caso a parte e va sempre elencato per nome: vuol dire che il badge
+non è stato interpretato, cioè che quel negozio **non è stato scritto** pur essendo stato
+approvato.
 
 ## Correggere un dominio
 
@@ -230,8 +272,12 @@ La modifica arriva a tutte le estensioni entro 24 ore da sola, o subito se Andre
   `pip install`, usa un venv usa e getta —
   `uv venv /tmp/revolut-ingest-venv && uv pip install --python /tmp/revolut-ingest-venv/bin/python Pillow`,
   poi `/tmp/revolut-ingest-venv/bin/python split_revolut.py …`.
-- Le domande ad Andrea costano molto tempo: farne **una sola**, in blocco, al passo 4, e una
-  di conferma finale al passo 5. Mai una domanda per singola card.
+- Le domande ad Andrea costano molto tempo: la scheda del passo 4 è **l'unica**. Mai una
+  domanda per singola card, e nessuna conferma finale: i default sono asimmetrici apposta
+  perché scrivere senza richiedere sia sicuro.
+- Un negozio che non compare negli screenshot **non è una sparizione finché non manca due
+  volte di fila**. È la regola che ha fatto perdere Booking quando non c'era: era assente per
+  la prima volta e fu disattivato lo stesso.
 - **Non abbassare il reasoning effort per andare più veloce.** Con effort basso i badge
   vengono letti male in modo silenzioso: nel run del 12/08/2026 sono comparsi valori `9x`
   inesistenti (Samsung letto 9x invece di 4x, Ralph Lauren 9x invece di 5x) che a effort alto
