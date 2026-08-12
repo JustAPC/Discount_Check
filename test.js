@@ -13,7 +13,7 @@ const ctx = {
   URL, TextDecoder, fetch: () => Promise.resolve({ text: () => Promise.resolve('') }),
   chrome: {
     runtime: { onInstalled: listener, onStartup: listener, onMessage: listener },
-    alarms: { onAlarm: listener, create: noop },
+    alarms: { onAlarm: listener, create: noop, clear: noop },
     storage: {
       local: {
         get: k => Promise.resolve(Object.fromEntries(
@@ -27,7 +27,7 @@ const ctx = {
   }
 };
 vm.createContext(ctx);
-vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild };', ctx);
+vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild, collapsed };', ctx);
 const T = ctx.__T;
 
 let fail = 0;
@@ -130,6 +130,14 @@ const negativi = ['amazon.it', 'ebay.it', 'subito.it', 'github.com', 'poste.it',
   'shein.com', 'temu.com', 'booking.com', 'aliexpress.com', 'netflix.com', 'zara.com',
   'bershka.com', 'douglas.it', 'lidl.it', 'conad.it', 'fnac.it', 'vinted.it'];
 eq('match: nessun falso positivo', negativi.filter(h => m(h).length), []);
+
+// --- collapsed: il portale è cambiato o il calo è vero? --------------------
+eq('collapsed: crollo da portale rotto', T.collapsed(12, 890, 0), true);
+eq('collapsed: crollo già visto, stavolta ci si crede', T.collapsed(12, 890, 1), false);
+eq('collapsed: calo fisiologico', T.collapsed(870, 890, 0), false);
+eq('collapsed: esattamente la metà non è un crollo', T.collapsed(445, 890, 0), false);
+eq('collapsed: primo crawl, niente da confrontare', T.collapsed(0, 0, 0), false);
+eq('collapsed: catalogo piccolo, può dimezzarsi davvero', T.collapsed(4, 30, 0), false);
 
 // --- checkHost: da qui dipende se il content script viene iniettato ---------
 // Prima girava su ogni pagina e decideva lui; ora un errore qui è un'estensione muta

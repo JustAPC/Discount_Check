@@ -18,6 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Il parsing del portale è a regex e si rompe in silenzio: se i test non passano
+      # la release non parte, invece di pubblicare un pacchetto che trova zero offerte.
+      - run: node test.js
+
       - id: v
         run: echo "v=$(jq -r .version manifest.json)" >> "$GITHUB_OUTPUT"
 

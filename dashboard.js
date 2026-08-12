@@ -54,7 +54,7 @@ async function refresh() {
   const running = st.state === 'running' || busy(S.revSync) || busy(S.klSync);
 
   $('dot').className = 'dot' + (running ? ' run' : st.state === 'login' ? ' warn'
-    : st.state === 'error' ? ' err' : '');
+    : st.state === 'suspect' ? ' warn' : st.state === 'error' ? ' err' : '');
   $('title').textContent = running ? 'Sincronizzazione' : 'Discount Check';
   $('sub').textContent = running
     ? `${st.phase === 'categorie' ? 'leggo le categorie' : 'leggo le offerte'} — ${st.done || 0}/${st.total || '?'}`
@@ -81,6 +81,14 @@ async function refresh() {
       $('cred-email').focus();
     };
     body.appendChild(b);
+  } else if (st.state === 'suspect') {
+    // Il catalogo mostrato è ancora quello vecchio, ed è il punto: meglio dati di ieri
+    // che un catalogo vuoto spacciato per fresco.
+    warn('Il portale ha risposto in modo strano',
+      `L'ultimo crawl ha trovato ${st.found} offerte invece di ${st.had}: un crollo così di solito ` +
+      'vuol dire che il portale è cambiato e non riesco più a leggerlo. Ho tenuto il catalogo ' +
+      'precedente e non ho salvato niente. Se al prossimo giro il portale dice la stessa cosa, ' +
+      'il calo è vero e lo accetto.');
   } else if (st.state === 'error') {
     warn('Sincronizzazione fallita', st.error || 'errore sconosciuto', 'err');
   }

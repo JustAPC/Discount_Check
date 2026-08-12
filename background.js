@@ -15,6 +15,7 @@ const BADGE_UPDATE = "#dc2626";
 const CONC = 4; // fetch in parallelo durante il crawl
 const PARSE_V = 2; // versione di parseOffer: bumpala e la sync ri-scarica tutto
 const SAVE_EVERY = 10; // batch tra un salvataggio e l'altro
+const COLLAPSE_MIN = 50; // sotto questa taglia un catalogo può dimezzarsi per motivi veri
 const SNOOZE_MS = 2 * 60 * 60 * 1000;
 const NUDGE_MS = 24 * 60 * 60 * 1000;
 
@@ -26,9 +27,14 @@ const set = (o) => chrome.storage.local.set(o);
 
 // --- lifecycle -------------------------------------------------------------
 
+// L'alarm che riprende il crawl interrotto esiste solo mentre un crawl è in corso.
+// Prima veniva creato una volta e non si spegneva più: ~1440 risvegli al giorno del
+// service worker per leggere una coda che è vuota tutto il giorno tranne pochi minuti.
+const watchQueue = () => chrome.alarms.create("resume", { periodInMinutes: 1 });
+const unwatchQueue = () => chrome.alarms.clear("resume");
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("daily", { periodInMinutes: 1440, delayInMinutes: 1 });
-  chrome.alarms.create("resume", { periodInMinutes: 1 });
   // Tutte e tre le fonti, non solo il portale: appena installata l'estensione deve
   // essere utile subito, senza aspettare l'alarm giornaliero o i bottoni singoli.
   sync();
@@ -37,10 +43,13 @@ chrome.runtime.onInstalled.addListener(() => {
   checkUpdate();
 });
 
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
   chrome.alarms.create("daily", { periodInMinutes: 1440 });
-  chrome.alarms.create("resume", { periodInMinutes: 1 });
   checkUpdate();
+  // Browser chiuso a metà crawl: la coda è ancora in storage, la sveglia va rimessa
+  // o quel crawl non ripartirebbe più da solo.
+  const { sync: st, queue = [] } = await get(["sync", "queue"]);
+  if (st && st.state === "running" && queue.length) watchQueue();
 });
 
 chrome.alarms.onAlarm.addListener((a) => {
@@ -183,6 +192,11 @@ async function fetchText(path, retry = true) {
 
 let running = false;
 
+// La regola che decide se buttare via un crawl intero, tenuta a parte perché è l'unica
+// cosa che separa "il portale è cambiato" da "aggiornato adesso, catalogo vuoto".
+// seen = l'abbiamo già vista al giro precedente, quindi stavolta ci si crede.
+const collapsed = (found, had, seen) => had >= COLLAPSE_MIN && found < had / 2 && !seen;
+
 async function sync() {
   if (running) return;
   const { sync: st } = await get("sync");
@@ -218,6 +232,24 @@ async function sync() {
       const cur = catalog.offers[id];
       if (!cur || cur.p !== PARSE_V) queue.push(p);
     }
+    // Il fallimento più insidioso: il portale cambia layout, le regex non trovano più
+    // le schede, il crawl finisce senza errori con il catalogo svuotato e la dashboard
+    // scrive "aggiornato adesso". Sembra tutto a posto e l'estensione è morta. Un
+    // crollo improvviso lo si guarda due volte prima di crederci: se al giro dopo il
+    // portale racconta ancora la stessa cosa allora è vero, e si accetta.
+    const had = Object.keys(catalog.offers).length;
+    const { collapse = 0 } = await get("collapse");
+    if (collapsed(live.size, had, collapse)) {
+      // Catalogo vecchio intatto: non si salva niente, si dice solo cos'è successo.
+      await set({
+        collapse: 1,
+        sync: { state: "suspect", found: live.size, had, at: Date.now() },
+      });
+      running = false;
+      return;
+    }
+    await set({ collapse: 0 });
+
     for (const id of Object.keys(catalog.offers)) if (!live.has(id)) delete catalog.offers[id];
 
     await set({
@@ -226,6 +258,7 @@ async function sync() {
       homeTitle,
       sync: { state: "running", phase: "offerte", total: queue.length, done: 0 },
     });
+    watchQueue();
     running = false;
     await drain();
   } catch (e) {
@@ -276,6 +309,7 @@ async function drain() {
     catalog.updatedAt = Date.now();
     await set({ catalog, queue: [], sync: { state: "idle", total, done: total, at: Date.now() } });
     await rebuild(catalog);
+    unwatchQueue();
   } catch (e) {
     await fail(e);
   } finally {
@@ -284,6 +318,9 @@ async function drain() {
 }
 
 async function fail(e) {
+  // Login scaduto o errore: il crawl non riprende da solo, quindi la sveglia non serve
+  // più. Riparte quando riparte la sync.
+  unwatchQueue();
   const { sync: st = {} } = await get("sync");
   await set({
     sync: {
