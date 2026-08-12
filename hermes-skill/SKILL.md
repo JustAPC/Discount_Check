@@ -69,8 +69,9 @@ Ogni card finisce in una di tre categorie:
 
 1. **Completa** — nome e badge leggibili: va nell'elenco normale.
 2. **Nome troncato dall'app** — il testo finisce con `…` (`Apple Store Onli…`) ma il badge si
-   legge: **non si scarta**, si porta al passo 4 come voce da confermare. La troncatura è
-   nella UI di Revolut, non nel ritaglio: riguardare l'immagine non la risolve.
+   legge: **non si scarta**, va in tabella 1 già segnato `[-]`, con accanto il negozio a
+   catalogo a cui somiglia. La troncatura è nella UI di Revolut, non nel ritaglio: riguardare
+   l'immagine non la risolve.
 3. **Illeggibile** — card tagliata dal bordo dell'immagine, senza nome o senza badge: si
    scarta e si conta.
 
@@ -83,6 +84,8 @@ Altre regole:
   decidere da solo, mai.** Va portato al passo 4 come conflitto, mostrando entrambi i valori:
   decide Andrea quale tenere. Un duplicato può anche voler dire che si è letto male un nome,
   quindi nasconderlo con una regola automatica nasconde un errore.
+- Ogni negozio letto va tenuto, anche quando è **identico** a com'è già a catalogo: non
+  comparirà in nessuna tabella, ma deve finire nell'upsert del passo 6.
 
 ### 3-bis. Controllo dei valori letti
 
@@ -93,20 +96,22 @@ Due controlli, entrambi a costo zero, prima di portare qualcosa al passo 4.
 passo 1. Revolut usa un insieme discreto e ricorrente di tassi (tipicamente 2, 3, 4, 5, 6, 7,
 8, 10, 11, 12, 13, 14, 15, 20). Un valore che **non compare in nessuna offerta esistente** è
 quasi sempre una lettura sbagliata: rileggi quella striscia prima di proporlo, e se dopo la
-rilettura resta, portalo al passo 4 come voce da confermare, mai scriverlo in silenzio.
+rilettura resta, portalo in tabella 3 segnato `[-]`, mai scriverlo in silenzio.
 
 **Salti grossi.** Un negozio già a catalogo che passa da `4x` a `9x` è più probabilmente un
-errore di lettura che un cambio di offerta. Va in `CAMBIATI` con il valore vecchio accanto,
-così la differenza si vede.
+errore di lettura che un cambio di offerta. Va in tabella 3 con il valore vecchio accanto,
+così la differenza si vede, e segnato `[-]`: se è una lettura sbagliata, non toccare niente
+è la cosa giusta.
 
 Se una striscia produce un valore dubbio, rileggerla **da sola** costa una chiamata: falla,
 invece di tirare a indovinare.
 
 ### 4. La scheda di revisione
 
-Una risposta sola, con **due tabelle a larghezza fissa**. Andrea le copia, le marca in un
-editor e le rimanda indietro: e' l'unico momento in cui decide, quindi deve poterlo fare riga
-per riga invece che con un "ok" globale.
+Una risposta sola, con **tre tabelle a larghezza fissa**, una per tipo di azione: chi entra,
+chi si spegne, chi cambia. Andrea le copia, le marca in un editor e le rimanda indietro: e'
+l'unico momento in cui decide, quindi deve poterlo fare riga per riga invece che con un "ok"
+globale.
 
 Vale una regola sopra tutte:
 
@@ -114,45 +119,74 @@ Vale una regola sopra tutte:
 > "Confermi i completamenti piu' plausibili?" e' una domanda inutile: Andrea non puo'
 > rispondere se non vede cosa stai per scrivere.
 
-#### Chi finisce nella prima tabella
+Prima delle tabelle, tre righe di contesto: quanti tile letti e quanti scartati, quanti
+negozi ci sono a catalogo e di quando e' l'ultima lettura (`updated_at` dal passo 1), e cosa
+succede se non tocca niente.
 
-Un negozio si propone per la disattivazione **solo se e' assente da due letture di fila**.
-La discriminante e' `last_seen` confrontato con la data dell'ultimo ingest, che e' il
-`updated_at` restituito dal passo 1:
+#### Dove va ogni negozio
 
-| Situazione | Significato | Cosa fare |
-|---|---|---|
-| compare, con qualunque tasso | vivo, magari cambiato | va in **tabella 2**, mai disattivato |
-| non compare, ma `last_seen` == ultimo ingest | c'era l'ultima volta: **probabilmente non l'hai letto** | una riga di nota, **non proporlo** |
-| non compare, e `last_seen` < ultimo ingest | assente due volte: **sparito** | va in **tabella 1** |
+| Cosa hai letto | Dove va |
+|---|---|
+| un nome che non esiste a catalogo | **tabella 1**, nuovo |
+| un nome che esiste ma e' `active = 0` | **tabella 1**, con la nota che riscriverlo lo riattiva |
+| un nome che esiste, con valori diversi | **tabella 3** |
+| un nome che esiste, identico | **nessuna tabella** — ma va comunque nell'upsert, vedi passo 6 |
+| niente: il negozio e' a catalogo e non l'hai letto | **tabella 2** |
 
-Un cambio di tasso non e' mai una sparizione, e una singola lettura andata male non puo'
-togliere niente dal catalogo.
+Un cambio di tasso non e' mai una sparizione: `20x` che diventa `10x` e' una modifica del
+record, non una rimozione.
+
+#### La tabella 2 le contiene tutte, ma non le propone tutte
+
+Ogni negozio a catalogo che non hai letto e' una riga, **tutte a `[ ]`**: la disattivazione
+non e' mai il default. A distinguerle e' la colonna "assente da", calcolata confrontando
+`last_seen` con `updated_at`:
+
+- **1 lettura** — c'era all'ingest precedente. Quasi sempre vuol dire che Andrea non ha
+  scrollato fin laggiu', non che il negozio sia sparito.
+- **2 letture o piu'** — assente due volte di fila. Qui una `[x]` e' probabilmente giusta.
+
+Vanno ordinate dalla piu' assente alla meno, cosi' le candidate vere stanno in cima. Erano
+una nota in prosa e sono diventate righe perche' **se e' una decisione, dev'essere una riga**:
+sapere che un negozio non e' stato letto senza poterlo marcare costringe a un secondo giro.
 
 #### Come si presenta
 
 ```
-DISATTIVAZIONI — non ne avviene nessuna se non la marchi tu
-scrivi  [x]  per disattivare, lascia  [ ]  per lasciare attivo
+1. NUOVI — si aggiungono tutti, tranne quelli che salti
+   scrivi  [-]  per saltare la riga; il dominio mettilo nell'ultima colonna
 
-     negozio                      aveva   assente da   dominio curato
+     negozio                 valore  nota                              dominio
+     ------------------------------------------------------------------------------
+[ ]  Mareluna Beauty         6x                                        .
+[ ]  Tecnobit                3x                                        .
+[ ]  Pontedoro               4x      era a catalogo, disattivato il    .
+                                     02/08. Riscriverlo lo riattiva.
+[-]  Orsini Sport Onli…      4x      nome troncato dall'app. Sembra    .
+                                     "Orsini Sport Online", gia' a
+                                     catalogo a 8x: cosi' creerebbe un
+                                     doppione. Correggi il nome.
+
+
+2. DA DISATTIVARE — non ne avviene nessuna se non la marchi tu
+   scrivi  [x]  per disattivare, lascia  [ ]  per lasciare attivo
+
+     negozio                 aveva   assente da   dominio curato
      -------------------------------------------------------------------
-[ ]  Corsica Ferries              5x      2 letture    corsicaferries.it
-[ ]  Busch Gardens                4x      3 letture    —
+[ ]  Bellagio Viaggi         12x     3 letture    bellagioviaggi.it
+[ ]  Casa Verdi              5x      2 letture    —
+[ ]  NordFly                 8x      1 lettura    nordfly.com
+[ ]  Fioreria Bianchi        4x      1 lettura    —
 
-non lette stavolta, ma c'erano all'ingest precedente — non tocco niente:
-Booking, Dolce & Gabbana, Stanley 1913
 
+3. MODIFICHE A RECORD ESISTENTI — si applicano tutte, tranne quelle che salti
+   scrivi  [-]  per saltare la riga
 
-DA SCRIVERE — si applicano tutte, tranne quelle che salti
-scrivi  [-]  per saltare la riga; il dominio mettilo nell'ultima colonna
-
-     negozio                      valore  cosa cambia   dominio
+     negozio                 da      a       cosa cambia
      -------------------------------------------------------------------
-[ ]  Nike                         20x     nuovo         .
-[ ]  Corriere dello Sport         10x     nuovo         .
-[ ]  LEGO Store                   10x     era 4x        .
-[ ]  Apple Store Onli…            4x      nome troncato .
+[ ]  Verdi Farmacie          8x      4x      tasso
+[-]  Cicli Ferrari           20x     ?       conflitto: letto 20x (viola)
+                                             e 5x (grigio). Dimmi quale tengo.
 ```
 
 Regole di composizione:
@@ -162,71 +196,99 @@ Regole di composizione:
 - il marcatore sta **all'inizio della riga**, che e' il punto piu' facile da raggiungere;
 - il punto `.` nella colonna dominio e' un segnaposto da sovrascrivere: una cella vuota non
   si vede;
-- un nome troncato dall'app (`Apple Store Onli…`) si porta cosi' com'e' letto, con
-  `nome troncato` nella colonna "cosa cambia": e' Andrea a completarlo scrivendolo di fianco;
+- **le righe su cui hai un dubbio partono gia' a `[-]`**, con la ragione scritta di fianco.
+  Il default "si scrive" vale per le righe pulite, non per quelle incerte: un nome troncato
+  scritto com'e' creerebbe un doppione, ed e' esattamente il modo in cui un negozio vivo
+  finisce spento e sostituito da un gemello;
 - **stesso negozio con tassi diversi** (es. `dott` 10x viola e `Dott` 2x grigio): una riga
-  sola con `conflitto: 10x o 2x?` nella colonna "cosa cambia". Non decidere mai da solo — un
-  duplicato puo' anche voler dire che si e' letto male un nome, e nasconderlo con una regola
-  automatica nasconde un errore;
+  sola in tabella 3, con `conflitto: 10x o 2x?` nella colonna "cosa cambia". Non decidere mai
+  da solo — un duplicato puo' anche voler dire che si e' letto male un nome, e nasconderlo
+  con una regola automatica nasconde un errore;
 - se una tabella e' vuota, scrivere `nessuna` invece di omettere la sezione: "non ci sono
   disattivazioni" e "me ne sono dimenticato" non devono avere lo stesso aspetto.
 
 ### 5. Interpretare la risposta
 
 Andrea rimanda indietro la scheda, marcata come gli e' comodo. **Interpreta cosa intende, non
-pretendere la sintassi**: puo' scrivere `x`, `si`, `disattiva`, puo' correggere un nome
-scrivendolo di fianco, puo' aggiungere una nota a parole. La sintassi proposta e' un aiuto,
-non un contratto.
+pretendere la sintassi**: `[]` senza spazio, `[ x]` con lo spazio di troppo, `si`, `no`,
+`disattiva`, un nome corretto scritto di fianco, una nota a parole. La sintassi proposta e'
+un aiuto, non un contratto.
 
 I default sono asimmetrici, ed e' voluto:
 
-- **una riga non marcata in tabella 1 non disattiva niente.** Aggiungere un negozio sbagliato
+- **una riga non marcata in tabella 2 non disattiva niente.** Aggiungere un negozio sbagliato
   si vede e si disfa; spegnerne uno vivo e' silenzioso, e ce ne si accorge settimane dopo;
-- **una riga non marcata in tabella 2 si scrive.** E' il caso normale e non ha senso chiedere
-  trenta conferme per trenta negozi nuovi.
+- **una riga non marcata in tabella 1 o 3 si applica.** E' il caso normale e non ha senso
+  chiedere trenta conferme per trenta negozi nuovi.
 
-Se una riga resta **ambigua** dopo la risposta — non si capisce se il segno vuol dire una cosa
-o l'altra — non indovinare: saltala, e dillo fra i risultati. Su un'azione distruttiva
-l'incertezza non si risolve tirando a indovinare.
+**Cio' che Andrea scrive vince su un marcatore pre-impostato.** Se una riga porta `[-]` messo
+da te e lui ci scrive accanto "tieni 20x", ha risposto alla domanda che la riga poneva: quel
+`[-]` era una tua cautela, non una sua scelta. Applica, e dillo nel resoconto cosi' che un
+fraintendimento si veda. L'ambiguita' vera esiste solo fra due cose che ha scritto lui.
+
+Una correzione puo' **spostare una riga di tabella**: `Orsini Sport Onli…` con il nome
+completato smette di essere un negozio nuovo e diventa una modifica del record esistente
+(`8x → 4x`). Segui l'intenzione, non la posizione in cui la riga era stampata.
+
+Se una riga resta **ambigua** — due indicazioni sue che si contraddicono — non indovinare:
+saltala, e dillo fra i risultati. Su un'azione distruttiva l'incertezza non si risolve
+tirando a indovinare.
 
 Non serve una seconda conferma: scrivi, e poi riporta esattamente cosa hai scritto.
 
 ### 6. Scrittura
 
-Solo dopo la scheda rimandata indietro, e solo con ciò che ne risulta. In particolare
-`deactivate` contiene **soltanto le righe marcate a mano**: se Andrea non ha marcato niente,
-`deactivate` è un array vuoto, non l'elenco degli assenti.
+Solo dopo la scheda rimandata indietro, e solo con cio' che ne risulta.
+
+**`upsert` contiene tutto quello che hai letto, non solo cio' che cambia.** E' la regola meno
+ovvia di tutta la procedura, ed e' obbligatoria: `last_seen` si aggiorna **solo** con un
+upsert, e la colonna "assente da" della tabella 2 lo confronta con `updated_at`. Un negozio
+letto ma non riscritto perche' identico resterebbe con la data vecchia, e al prossimo ingest
+risulterebbe assente da una lettura; a quello dopo da due, e finirebbe proposto per la
+disattivazione pur essendo stato letto ogni volta. Riscrivere un record invariato non cambia
+niente nei valori: serve a dire "questo l'ho visto".
+
+**`deactivate` contiene soltanto le righe marcate a mano.** Se Andrea non ha marcato niente,
+e' un array vuoto — mai l'elenco degli assenti.
 
 ```bash
 curl -s -X POST "$SCONTI_API/revolut/ingest" \
   -H "X-Ingest-Token: $INGEST_TOKEN" \
   -H "content-type: application/json" \
   -d '{
-    "captured_at": "2026-08-11",
+    "captured_at": "2026-08-12",
     "upsert": [
-      {"name": "Wizz Air", "badge_raw": "2 per 10 €", "boosted": false, "channel": "online"},
-      {"name": "Nike",     "badge_raw": "20 per 10 €", "boosted": true,  "channel": "online"},
-      {"name": "Lounge by Zalando", "badge_raw": "2 per 10 €", "boosted": false,
-       "channel": "online", "domain": "zalando.it"}
+      {"name": "Mareluna Beauty", "badge_raw": "6 per 10 €", "boosted": false, "channel": "online"},
+      {"name": "Tecnobit", "badge_raw": "3 per 10 €", "boosted": false, "channel": "online"},
+      {"name": "Orsini Sport Online", "badge_raw": "4 per 10 €", "boosted": false,
+       "channel": "online", "domain": "orsinisport.it"}
     ],
-    "deactivate": ["zalando"]
+    "deactivate": ["bellagioviaggi"]
   }'
 ```
 
 `deactivate` prende i `name_key` restituiti da `GET /offers`, non i nomi.
 
-Il server risponde `{upserted, deactivated, skipped}`. Il resoconto ad Andrea non sono i
-numeri del server ma **cosa è successo a ciò che aveva marcato**, in quattro righe:
+Il resoconto ad Andrea non sono i numeri del server ma **cosa e' successo a cio' che aveva
+marcato**, una riga per tipo di esito:
 
 ```
-scritti        Nike 20x, Corriere dello Sport 10x, LEGO Store 4x → 10x
-domini         corrieredellosport.it su Corriere dello Sport
-disattivati    Corsica Ferries
-saltati        Apple Store Onli… (nome ambiguo, non ho capito la correzione)
+scritti        Mareluna Beauty 6x, Tecnobit 3x
+riattivati     Pontedoro 4x
+modificati     Verdi Farmacie 8x → 4x, Orsini Sport Online 8x → 4x  (nome corretto da te)
+confermati     Cicli Ferrari 20x — conflitto risolto come hai detto, valore invariato
+disattivati    Bellagio Viaggi
+invariati      30 negozi riscritti senza modifiche, solo per segnarli come visti
+domini         orsinisport.it su Orsini Sport Online
+saltati        nessuno
 ```
 
-`skipped` dal server è un caso a parte e va sempre elencato per nome: vuol dire che il badge
-non è stato interpretato, cioè che quel negozio **non è stato scritto** pur essendo stato
+Vanno sempre dette anche le righe dove hai deciso qualcosa al posto suo — un `[-]` scavalcato
+da una sua istruzione, una riga spostata di tabella — perche' e' l'unico modo in cui un
+fraintendimento si vede prima del prossimo ingest.
+
+`skipped` dal server e' un caso a parte e va elencato per nome: vuol dire che il badge non e'
+stato interpretato, cioe' che quel negozio **non e' stato scritto** pur essendo stato
 approvato.
 
 ## Correggere un dominio
