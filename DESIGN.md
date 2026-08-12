@@ -14,6 +14,8 @@ colors:
   cb-bg: "#e6f5ee"
   rev-ink: "#6b28d9"
   rev-bg: "#f0eafd"
+  kl-ink: "#b0114c"
+  kl-bg: "#fde8ef"
   run: "#1d4ed8"
   warn-ink: "#8a5106"
   warn-bg: "#fdf3e2"
@@ -74,6 +76,13 @@ components:
   chip-cb:
     backgroundColor: "{colors.cb-bg}"
     textColor: "{colors.cb-ink}"
+    typography: "{typography.label}"
+    rounded: "{rounded.chip}"
+    padding: "4px 6px"
+    width: "46px"
+  chip-kl:
+    backgroundColor: "{colors.kl-bg}"
+    textColor: "{colors.kl-ink}"
     typography: "{typography.label}"
     rounded: "{rounded.chip}"
     padding: "4px 6px"

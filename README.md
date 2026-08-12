@@ -70,6 +70,9 @@ Non si usa: si fa vedere lei.
 - **Badge sull'icona** appena apri un sito convenzionato — sai subito che c'è qualcosa da guardare
 - **Popup al checkout** (URL tipo `/cart`, `/checkout`, `/carrello`, o bottoni "procedi al
   pagamento", "completa l'ordine"), con le convenzioni che valgono per quel sito
+- **Il sito su cui sei, in cima alla dashboard**: le stesse righe della card, raggiungibili sempre.
+  Il badge dice che c'è qualcosa, questo dice *che cosa* — e da qui togli un abbinamento sbagliato
+  senza dover arrivare a un checkout
 - **Dashboard** per cercare nel catalogo, collegare a mano un'offerta a un sito, silenziare i siti
   che non ti interessano e correggere gli abbinamenti sbagliati
 
@@ -106,10 +109,18 @@ Il rilevamento del checkout è euristico e su e-commerce molto custom può non s
 il match a mancare, apri la dashboard, cerca l'offerta e usa **"collega a un sito"**: l'alias
 manuale vince su tutto.
 
-**Il popup esce dove non c'entra nulla**
+**Il badge o il popup escono dove non c'entrano nulla**
 
-È voluto: il matching preferisce i falsi positivi ai silenzi. Usa **"Non c'entra nulla"** nel popup,
-oppure la sezione **Segnalazioni di errore** in dashboard. È sempre reversibile.
+Dove il dominio non si sa, il matching indovina dal nome e preferisce i falsi positivi ai silenzi.
+Il rimedio immediato è il **divieto** (⊘) sulla riga, in cima alla dashboard o nella card: nasconde
+quell'offerta **su quel sito soltanto**, ed è reversibile da **Segnalazioni di errore**.
+
+Se il negozio è di Revolut, il rimedio definitivo è un altro: scrivergli il dominio giusto su
+`sconti-api`. Da quel momento quel negozio smette di essere indovinato per nome — non solo per te,
+ma per chiunque abbia l'estensione, entro 24 ore. Vedi [hermes-skill](hermes-skill/SKILL.md).
+
+**Nota:** "collega a un sito" non serve a questo. Aggiunge un dominio a un negozio, non lo toglie
+da un altro.
 
 ---
 
@@ -123,7 +134,16 @@ oppure la sezione **Segnalazioni di errore** in dashboard. È sempre reversibile
   `disclaimerAccept=1`. Il form non ha CSRF token. Senza questo passaggio il portale serve la home
   al posto di ogni scheda e il catalogo finisce vuoto
 - **Crawl ripartibile**: il service worker MV3 può essere terminato a metà, l'alarm `resume` (1 min)
-  riprende la coda
+  riprende la coda. Vive **solo durante un crawl**: viene creato quando parte la fase offerte e
+  tolto quando finisce o fallisce, altrimenti sarebbero ~1440 risvegli al giorno per leggere una
+  coda vuota
+- **Iniezione condizionale**: `content.js` non è dichiarato nel manifest. Il service worker ascolta
+  `tabs.onUpdated`, confronta l'hostname con gli indici che ha già e chiama `scripting.executeScript`
+  solo dove c'è almeno un vantaggio. Sui siti che non c'entrano non gira una riga di codice nostro
+- **Crollo sospetto**: se un crawl trova meno della metà delle offerte del precedente, il catalogo
+  vecchio **non** viene sostituito e la dashboard lo dice. Se al giro dopo il portale racconta la
+  stessa cosa, il calo è vero e si accetta — altrimenti un cambio di layout del portale svuoterebbe
+  il catalogo lasciando scritto "aggiornato adesso"
 
 ### Seconda fonte: Revolut
 

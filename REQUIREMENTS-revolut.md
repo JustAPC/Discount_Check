@@ -27,7 +27,7 @@ screenshot (app Revolut, anche stitchati lunghi)
 |---|---|
 | Andrea | screenshot → allegato in chat Hermes → `ingest revolut` → approva il diff **nella stessa chat** |
 | **Hermes Agent** | split immagine, lettura crop (vision), diff vs stato attuale, `POST /ingest` |
-| **sconti-api** (Docker su TrueNAS) | due endpoint: legge e scrive `revolut_offer`. Non vede mai immagini, non decide nulla |
+| **sconti-api** (Docker su TrueNAS) | legge e scrive `revolut_offer`. Non vede mai immagini, non decide nulla |
 | Estensione | `GET /offers` 1x/giorno, cache, match, popup. **Sola lettura** |
 
 Due punti fermi:
@@ -44,7 +44,7 @@ Due punti fermi:
 | Cattura | 1-2 screenshot lunghi stitchati, si analizza tutto ciò che c'è nell'immagine |
 | Split | dentro Hermes, `code_execution` + Pillow, strisce da 6-8 tile |
 | Vision | il modello che Hermes usa già: `gpt-5.5` via provider `openai-codex` — nessuna chiave nuova |
-| Mapping nome→dominio | matcher esistente (`matchIds`) permissivo + alias manuali dalla dashboard |
+| Mapping nome→dominio | **il campo `domain` sul server**, curato negozio per negozio. Il matcher sui nomi resta solo per chi non ce l'ha |
 | Host API | `sconti-api.andreapontillo.tech` via Cloudflare Tunnel |
 | Auth | **Una sola chiave, `INGEST_TOKEN`, solo in scrittura.** Lettura pubblica: il catalogo non è sensibile e così i client non gestiscono credenziali. Niente Cloudflare Access |
 | Review | diff in chat Hermes: al server arriva solo ciò che hai approvato, quindi niente si spegne da sé |
@@ -55,11 +55,20 @@ Gli screenshot stitchati sono ~100 tile di altezza. Qualunque modello vision rid
 l'immagine in ingresso e i badge `2x` — piccoli e sovrapposti al logo — sono i primi
 caratteri a diventare illeggibili. Si taglia prima, si analizza dopo.
 
-### Matching permissivo, come CB
-Il falso positivo costa poco: con Revolut si paga comunque, al massimo si fanno passaggi
-in app inutili. Il falso negativo fa perdere il moltiplicatore. Quindi si riusa `matchIds`
-così com'è (dominio + nome normalizzato, substring inclusi) e si accetta il rumore. Il
-pattern `blocked` esistente serve anche qui, con chiave separata dalle offerte CB.
+### Matching: permissivo solo dove il dominio non si sa
+Scritto all'inizio come "si accetta il rumore", perché il falso positivo sembrava costare
+poco: con Revolut si paga comunque. **Non ha retto all'uso.** Il badge si vede su ogni tab,
+e il rumore lì è permanente e visibile: "Qatar Airways" compariva su `ita-airways.com` e
+"Corriere dello Sport" su `corriere.it`, perché i nomi di due parole producevano chiavi come
+`airways` e `corriere`.
+
+La correzione non è stata stringere le euristiche — ogni giro più severo recupera un falso
+positivo e ne perde uno vero — ma **curare il dato**: un negozio con `domain` esce dagli
+indici sui nomi ed entra solo in quelli sul dominio. Dove il sito si sa, non si indovina; e
+un dominio scritto sul server vale per tutti entro 24 ore senza pubblicare nulla.
+
+Il pattern `blocked` esistente resta come rimedio immediato e locale, con chiave separata
+dalle offerte CB.
 
 ## Schema MariaDB
 
@@ -73,7 +82,7 @@ CREATE TABLE revolut_offer (
   badge_raw  VARCHAR(48)  NOT NULL,              -- "2 per 10 €", testo esatto letto dal tile
   boosted    TINYINT(1)   NOT NULL DEFAULT 0,    -- badge viola = tasso potenziato
   channel    ENUM('online','instore','both') NOT NULL DEFAULT 'online',
-  domain     VARCHAR(190) NULL,                  -- alias manuale
+  domain     VARCHAR(190) NULL,                  -- curato a mano: vince sull'ingest
   active     TINYINT(1)   NOT NULL DEFAULT 1,
   first_seen DATE NOT NULL,
   last_seen  DATE NOT NULL,
@@ -111,19 +120,27 @@ configurato il server rifiuta di scrivere (503) invece di accettare tutto.
 |---|---|---|
 | GET | `/revolut/offers` | `{updated_at, offers:[{id, name, name_key, kind, rate, badge_raw, boosted, channel}]}` |
 | POST | `/revolut/ingest` | `{captured_at, upsert:[{name, badge_raw, boosted, channel, domain?}], deactivate:[name_key]}` → `{upserted, deactivated, skipped}` |
+| POST | `/revolut/domains` | `{name_key: dominio}` → `{set, unset, unknown}`. Scrive e corregge i domini senza toccare i tassi |
 
 `name_key`, `kind` e `rate` li deriva il server dal testo del badge: un solo parser, non
 una regola replicata nella skill.
 
-Due endpoint, ~60 righe. Il server **esegue letteralmente** ciò che riceve: non inferisce
-le rimozioni dall'assenza nella lista. Uno snapshot parziale quindi non può cancellare
+Tre endpoint di scrittura e lettura, poche righe l'uno. Il server **esegue letteralmente**
+ciò che riceve: non inferisce le rimozioni dall'assenza nella lista. Uno snapshot parziale quindi non può cancellare
 niente — è Hermes, con te che approvi, a decidere cosa disattivare.
 
 `GET /offers` serve sia l'estensione (filtrata: solo `active`, `channel != instore`) sia
 Hermes, che la usa come stato di partenza per il diff.
 
-Gli **alias** dominio restano nell'estensione, in `storage.local`: il meccanismo esiste già
-e non c'è motivo di duplicarlo sul server.
+Il **dominio** è l'unico campo che non arriva dagli screenshot: si decide guardando dove si
+compra davvero. Per questo `/ingest` può solo riempirlo dove è vuoto — `COALESCE(domain,
+VALUES(domain))` — e non lo sovrascrive mai: la skill lo *propone* al passo 4, dove un "ok"
+distratto lo cancellerebbe in silenzio. Per scriverlo o correggerlo c'è `/revolut/domains`,
+che è esplicito per costruzione.
+
+Gli alias locali della dashboard restano, ma sono un ripiego per-dispositivo: quando il server
+impara il dominio di quel negozio, l'estensione li cancella da sola, o resterebbero applicati
+sopra il dato buono appena arrivato.
 
 Hardening opzionale: una regola di rate limiting Cloudflare su `/revolut/ingest`. L'endpoint
 è pubblico, quindi raggiungibile dagli scanner: il codice è minimo e le query parametrizzate,

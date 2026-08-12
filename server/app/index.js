@@ -1,7 +1,8 @@
-// sconti-api — due endpoint sopra MariaDB. Nessuna logica di dominio: decide Hermes.
+// sconti-api — pochi endpoint sopra MariaDB. Nessuna logica di dominio: decide Hermes.
 //
 //   GET  /revolut/offers   → lista attiva. Pubblica: quali negozi diano punti non è un segreto
 //   POST /revolut/ingest   → applica letteralmente upsert/deactivate già approvati
+//   POST /revolut/domains  → scrive e corregge i domini, l'unico campo che non viene dagli screenshot
 //
 // La scrittura è protetta solo da INGEST_TOKEN, quindi senza token il server rifiuta di
 // scrivere: meglio un ingest che non parte che un catalogo che chiunque può riempire.

@@ -1,6 +1,6 @@
 # sconti-api
 
-Due endpoint sopra MariaDB, dietro Cloudflare Tunnel su `sconti-api.andreapontillo.tech`.
+Tre endpoint sopra MariaDB, dietro Cloudflare Tunnel su `sconti-api.andreapontillo.tech`.
 Serve il catalogo Revolut all'estensione e riceve gli ingest da Hermes.
 
 Il server **non decide niente**: non calcola delta, non deduce rimozioni dall'assenza di un
@@ -51,8 +51,9 @@ Body di ingest:
 posto solo. Le righe con badge illeggibile non bloccano l'ingest, tornano in `skipped`.
 
 `domain` è opzionale e serve ai negozi il cui nome non assomiglia al sito (`AG1` →
-`drinkag1.com`). Se non lo mandi, un dominio già salvato **resta**: gli ingest successivi non
-cancellano un collegamento fatto a mano.
+`drinkag1.com`). L'ingest lo scrive **solo dove è vuoto**: un dominio già salvato resta com'è
+sia che tu ometta il campo, sia che ne mandi uno diverso. Per cambiarlo serve
+`/revolut/domains`.
 
 ---
 
@@ -194,7 +195,7 @@ Due conseguenze da tenere a mente:
   tutto: senza Access davanti, un token vuoto sarebbe una porta aperta;
 - l'endpoint è raggiungibile dagli scanner di internet. Il codice è minimo e le query sono
   parametrizzate, ma se vuoi una rete di sicurezza in più, una regola di **rate limiting**
-  di Cloudflare su `/revolut/ingest` costa due minuti ed è gratis.
+  di Cloudflare sui due `POST /revolut/*` costa due minuti ed è gratis.
 
 ## 6. Verifica finale
 

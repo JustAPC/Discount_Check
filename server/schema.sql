@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS revolut_offer (
   badge_raw  VARCHAR(48)  NOT NULL,              -- "2 per 10 €" — testo esatto letto dal tile
   boosted    TINYINT(1)   NOT NULL DEFAULT 0,    -- badge viola = tasso potenziato
   channel    ENUM('online','instore','both') NOT NULL DEFAULT 'online',
-  domain     VARCHAR(190) NULL,                  -- alias impostato a mano, se serve
+  domain     VARCHAR(190) NULL,                  -- curato a mano: l'ingest non lo sovrascrive
   active     TINYINT(1)   NOT NULL DEFAULT 1,
   first_seen DATE NOT NULL,
   last_seen  DATE NOT NULL,
