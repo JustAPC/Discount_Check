@@ -410,13 +410,9 @@ function renderUpdate() {
   $('ver').classList.toggle('old', !!u);
   $('upd').hidden = !u;
   if (!u) return;
-  $('upd').href = u.url;
   // L'estensione non può aprire il Finder né conoscere la propria cartella su disco:
-  // l'unica cosa utile che può fare è dire dov'è lo script e cosa farà.
-  $('upd-txt').textContent =
-    `Versione ${u.version} disponibile — hai la ${S.version}. ` +
-    'Doppio clic su aggiorna.command (macOS) o aggiorna.bat (Windows) nella cartella ' +
-    "dell'estensione, oppure apri la pagina della release.";
+  // l'unica cosa utile che può fare è dire il gesto esatto. Il resto sta nella guida.
+  $('upd-txt').textContent = `Versione ${u.version} disponibile — hai la ${S.version}`;
 }
 
 // --- credenziali del portale ---------------------------------------------------

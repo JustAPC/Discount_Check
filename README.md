@@ -11,42 +11,85 @@ Tre fonti in una sola riga al checkout:
 
 ---
 
-## Installazione
+## Da dove parti?
 
-Serve una volta sola, cinque minuti.
+- **Ce l'ho già installata e devo aggiornarla** → [Aggiornare](#aggiornare)
+- **Non ce l'ho, la installo adesso** → [Prima installazione](#prima-installazione)
 
-**1. Scarica il pacchetto**
+---
 
-Su **macOS**, apri Terminale (⌘+Spazio → "Terminale") e incolla:
+## Aggiornare
+
+Quando esce una versione nuova la dashboard te lo dice in cima, con un **`!` rosso** sull'icona.
+Non serve scaricare niente da GitHub.
+
+**1. Apri la cartella dell'estensione** — quella che hai scelto quando l'hai caricata in Chrome. Se
+non ti ricordi dov'è: `chrome://extensions` → **Dettagli** su Discount Check → il percorso è scritto
+sotto "Origine".
+
+**2. Doppio clic sullo script:**
+
+| Sistema | File               |
+| ------- | ------------------ |
+| macOS   | `aggiorna.command` |
+| Windows | `aggiorna.bat`     |
+
+**3. Rispondi sì al riavvio di Chrome.** Serve perché Chrome rilegge le estensioni non pacchettizzate
+solo all'avvio.
+
+Lo script scarica l'ultima release, fa un backup della cartella, installa sopra e verifica il
+risultato: se qualcosa va storto ripristina il backup e te lo dice. L'estensione **non viene mai
+rimossa**, quindi credenziali, catalogo, alias, segnalazioni e l'icona fissata nella barra restano
+dove sono.
+
+> **Non trovi lo script?** Hai una versione precedente alla 1.0.6. Fai un ultimo aggiornamento a
+> mano: scarica [discount-check.zip](https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip),
+> scompattalo **sopra la cartella che usi già**, poi `chrome://extensions` → **Aggiorna**. Dalla
+> prossima volta ci pensa lo script.
+
+> ⚠️ **Non usare "Rimuovi" e poi ricaricare.** Quando rimuovi un'estensione Chrome cancella anche il
+> suo `chrome.storage.local`: perdi credenziali, catalogo e segnalazioni. Stessa cosa se sposti la
+> cartella: l'ID dell'estensione dipende dal percorso.
+
+---
+
+## Prima installazione
+
+Cinque minuti, una volta sola.
+
+### 1. Scarica il pacchetto
+
+**macOS** — apri Terminale (⌘+Spazio → "Terminale") e incolla:
 
 ```bash
 mkdir -p ~/Documents/discount-check && curl -sL -o /tmp/dc.zip https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip && unzip -oq /tmp/dc.zip -d ~/Documents/discount-check && open ~/Documents/discount-check
 ```
 
-Su **Windows**, apri PowerShell e incolla:
+**Windows** — apri PowerShell e incolla:
 
 ```powershell
 $d="$env:USERPROFILE\Documents\discount-check"; mkdir $d -Force | Out-Null; Invoke-WebRequest https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip -OutFile "$env:TEMP\dc.zip"; Expand-Archive "$env:TEMP\dc.zip" $d -Force; explorer $d
 ```
 
-Scarica e scompatta in `Documenti/discount-check`, poi apre la cartella.
+Scaricano e scompattano in `Documenti/discount-check`, poi aprono la cartella.
 
-> Perché da riga di comando e non dal browser: i file scaricati dal browser vengono marcati come
-> "provenienti da internet", e al primo doppio clic sullo script di aggiornamento macOS dice che
-> _potrebbe contenere malware_ e Windows mostra SmartScreen. Scaricando così il problema non si pone.
-> Se preferisci comunque il download manuale, vedi [Installazione dal browser](#installazione-dal-browser).
+> **Perché da riga di comando e non dal browser?** I file scaricati dal browser vengono marcati come
+> "provenienti da internet": al primo doppio clic sullo script di aggiornamento macOS direbbe che
+> _potrebbe contenere malware_ e Windows mostrerebbe SmartScreen. Così il problema non si pone. Se
+> preferisci comunque scaricare lo zip a mano funziona tutto uguale, ma la prima volta lo script va
+> aperto con **tasto destro → Apri** (macOS) o **Ulteriori informazioni → Esegui comunque**
+> (Windows).
 
-**2. Caricala in Chrome**
+### 2. Caricala in Chrome
 
 1. apri `chrome://extensions`
 2. attiva **Modalità sviluppatore** (in alto a destra)
 3. **Carica estensione non pacchettizzata** → seleziona `Documenti/discount-check`
 
 Chrome carica l'estensione **da quella cartella**, non ne fa una copia: non spostarla e non
-cancellarla. L'ID dell'estensione dipende dal percorso, quindi spostarla equivale a reinstallarla
-da zero.
+cancellarla.
 
-**3. Inserisci le credenziali del portale**
+### 3. Inserisci le credenziali del portale
 
 Clicca l'icona dell'estensione → **Apri dashboard** → sezione **Accesso al portale** → email e
 password del portale Corporate Benefits → **Salva**.
@@ -55,55 +98,12 @@ Sono le stesse con cui accedi al sito. Restano in `chrome.storage.local`, su que
 sono nel repo né nel pacchetto, e ogni installazione ha le sue. La dashboard non le rilegge mai — il
 campo password ti dice solo se è salvata.
 
-**4. Primo aggiornamento**
+### 4. Primo aggiornamento del catalogo
 
 Premi **Aggiorna tutto**. Il primo crawl del portale scarica ~900 offerte e dura qualche minuto:
 puoi chiudere la dashboard, va avanti da solo. Revolut e Klarna sono immediati.
 
-Da qui in poi non devi fare più nulla: l'aggiornamento è automatico ogni 24 ore.
-
----
-
-## Aggiornare l'estensione
-
-Quando esce una versione nuova la dashboard te lo dice in cima, con un **`!` rosso** sull'icona.
-Da lì in poi è un doppio clic: nella cartella dell'estensione trovi
-
-- **macOS** → `aggiorna.command`
-- **Windows** → `aggiorna.bat`
-
-Lo script scarica l'ultima release, fa un backup della cartella, installa sopra e ti propone di
-riavviare Chrome (serve perché Chrome rilegge le estensioni non pacchettizzate solo all'avvio). Se
-qualcosa va storto ripristina il backup e ti dice cosa è successo.
-
-L'estensione **non viene mai rimossa**: credenziali, catalogo, alias, segnalazioni e l'icona
-fissata nella barra restano dove sono.
-
-### Installazione dal browser
-
-Se preferisci scaricare `discount-check.zip` a mano dalla
-[release più recente](https://github.com/JustAPC/Discount_Check/releases/latest), scompattalo in una
-cartella stabile (non Download) e caricalo come sopra. Cambia una cosa sola: al **primo** doppio clic
-sullo script di aggiornamento il sistema lo blocca, perché il browser marca i file come provenienti
-da internet.
-
-- **macOS**, "potrebbe contenere malware" / "sviluppatore non identificato": tasto destro sul file →
-  **Apri** → **Apri**
-- **Windows**, "Windows ha protetto il PC": **Ulteriori informazioni** → **Esegui comunque**
-
-Succede una volta sola: lo script toglie il flag di quarantena dalla cartella, e comunque dagli
-aggiornamenti successivi i file li scarica lui con `curl`, non il browser.
-
-### A mano, se preferisci
-
-1. scarica il nuovo `discount-check.zip`
-2. scompattalo **sopra la cartella esistente**, sostituendo i file
-3. `chrome://extensions` → **Aggiorna** (l'icona di ricarica sulla scheda dell'estensione)
-
-> ⚠️ **Non usare "Rimuovi" e poi "Carica estensione non pacchettizzata".** Quando rimuovi
-> un'estensione Chrome cancella anche il suo `chrome.storage.local`: perdi credenziali, catalogo,
-> alias e segnalazioni, e devi rifare tutto da capo. Vale anche per la cartella: l'ID
-> dell'estensione dipende dal percorso, quindi spostarla altrove equivale a reinstallarla da zero.
+Da qui in poi non devi fare più nulla: il catalogo si aggiorna da solo ogni 24 ore.
 
 ---
 

@@ -260,26 +260,18 @@
       /* Il pallino rosso è lo stesso segnale del badge sull'icona: si trovano a vicenda. */
       .upd {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 8px;
         margin-top: 10px;
-        padding: 7px 9px;
+        padding: 8px 10px;
         border: 1px solid var(--line);
         border-radius: var(--r);
         background: var(--bg);
         color: var(--ink);
         font-size: 11px;
-        text-decoration: none;
-        transition:
-          background var(--t),
-          border-color var(--t);
       }
       .upd[hidden] {
         display: none;
-      }
-      .upd:hover {
-        background: var(--raise);
-        border-color: var(--ink-3);
       }
       .upd-dot {
         width: 6px;
@@ -287,11 +279,36 @@
         border-radius: 50%;
         background: var(--err-ink);
         flex: none;
+        margin-top: 5px;
+      }
+      .upd-body p {
+        margin: 3px 0 0;
+        color: var(--ink-2);
+        line-height: 1.5;
+      }
+      .upd-body code {
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        padding: 1px 3px;
+        border-radius: 3px;
+        background: var(--raise);
+      }
+      /* Il link è l'unica cosa cliccabile del riquadro: va distinto dal testo. */
+      .upd-body a {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 5px;
+        color: var(--ink);
+        font-weight: 500;
+        text-decoration: underline;
+      }
+      .upd-body a:hover {
+        color: var(--err-ink);
       }
       .upd .ic {
-        width: 13px;
-        height: 13px;
-        margin-left: auto;
+        width: 11px;
+        height: 11px;
         color: var(--ink-3);
       }
 
@@ -732,11 +749,21 @@
       <div class="bar" id="bar" hidden><i></i></div>
       <!-- Sta sopra le azioni perché è l'unica cosa che vale più di "Aggiorna tutto":
        un catalogo aggiornato con codice vecchio serve a poco. -->
-      <a class="upd" id="upd" hidden target="_blank" rel="noreferrer">
+      <div class="upd" id="upd" hidden>
         <span class="upd-dot"></span>
-        <span id="upd-txt"></span>
-        <svg class="ic"><use href="#i-external" /></svg>
-      </a>
+        <div class="upd-body">
+          <b id="upd-txt"></b>
+          <p>
+            Apri la cartella dell'estensione e fai doppio clic su <code>aggiorna.command</code>
+            (macOS) o <code>aggiorna.bat</code> (Windows): scarica la versione nuova e riavvia
+            Chrome. L'estensione non viene rimossa, non perdi credenziali né catalogo.
+          </p>
+          <a href="https://justapc.github.io/Discount_Check/" target="_blank" rel="noreferrer">
+            Clicca qui per vedere la guida completa
+            <svg class="ic"><use href="#i-external" /></svg>
+          </a>
+        </div>
+      </div>
       <div
         style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px"
       >
