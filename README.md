@@ -80,8 +80,9 @@ Il tag **è** la version di `manifest.json`. Se non la bumpi, la release esisten
 in silenzio e nessuno viene avvisato: bumpare `manifest.json` è il gesto che dice "questa vale la
 pena scaricarla".
 
-L'estensione controlla una volta al giorno l'ultima release su GitHub. Se è più recente di quella
-installata: riga cliccabile in cima alla dashboard e **`!` rosso sul badge** dell'icona. Il badge
+L'estensione controlla una volta al giorno la `version` nel manifest servito da GitHub Pages
+(`justapc.github.io/cb-reminder/manifest.json`) — non l'API di GitHub, che ha 60 richieste/ora per
+IP e risponde 403 quando le esaurisci con altro. Se è più recente di quella installata: riga cliccabile in cima alla dashboard e **`!` rosso sul badge** dell'icona. Il badge
 del conteggio offerte ha però la precedenza sui siti convenzionati — lì il `!` non compare, perché
 sapere che c'è uno sconto vale più che sapere che c'è un aggiornamento.
 

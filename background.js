@@ -7,7 +7,10 @@ const REVOLUT_API = 'https://sconti-api.andreapontillo.tech';
 const KLARNA_API = 'https://www.klarna.com/it/api/store-edge-rest/public/stores/directory/search/IT';
 const KLARNA_PAGE = 100;   // oltre 100 per pagina l'API risponde con zero negozi
 // L'estensione si distribuisce a mano: qui si guarda se c'è una release più nuova.
-const RELEASES_API = 'https://api.github.com/repos/JustAPC/cb-reminder/releases/latest';
+// La version si legge dal manifest servito da GitHub Pages, non dall'API: l'API ha
+// 60 richieste/ora per IP e le si esaurisce con altro, restituendo 403 in silenzio.
+const LATEST_MANIFEST = 'https://justapc.github.io/cb-reminder/manifest.json';
+const RELEASES_PAGE = 'https://github.com/JustAPC/cb-reminder/releases/latest';
 const BADGE_UPDATE = '#dc2626';
 const CONC = 4;            // fetch in parallelo durante il crawl
 const PARSE_V = 2;         // versione di parseOffer: bumpala e la sync ri-scarica tutto
@@ -47,19 +50,16 @@ chrome.alarms.onAlarm.addListener(a => {
 
 async function checkUpdate() {
   try {
-    const r = await fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } });
+    const r = await fetch(LATEST_MANIFEST, { cache: 'no-cache' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    const { tag_name, html_url } = await r.json();
-    const latest = String(tag_name || '').replace(/^v/, '');
+    const latest = String((await r.json()).version || '');
     if (!/^\d+(\.\d+)*$/.test(latest)) return;
     const has = newer(latest, chrome.runtime.getManifest().version);
-    await set({ update: has ? { version: latest, url: html_url } : null });
+    await set({ update: has ? { version: latest, url: RELEASES_PAGE } : null });
     // Badge di default: vale sulle tab dove nessun content script ha ancora parlato.
-    if (has) {
-      chrome.action.setBadgeText({ text: '!' });
-      chrome.action.setBadgeBackgroundColor({ color: BADGE_UPDATE });
-    }
-  } catch { /* offline o rate limit di GitHub: si riprova al prossimo giro */ }
+    chrome.action.setBadgeText({ text: has ? '!' : '' });
+    if (has) chrome.action.setBadgeBackgroundColor({ color: BADGE_UPDATE });
+  } catch { /* Pages non raggiungibile: si riprova al prossimo giro */ }
 }
 
 // "1.10.0" è più recente di "1.9.0": confronto campo per campo, non lessicografico.
