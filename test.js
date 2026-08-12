@@ -27,7 +27,7 @@ const ctx = {
   }
 };
 vm.createContext(ctx);
-vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost };', ctx);
+vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild };', ctx);
 const T = ctx.__T;
 
 let fail = 0;
@@ -70,6 +70,10 @@ eq('parseOffer negozio fisico', T.parseOffer(local, '/offer/1/cat/2').v.k, 'none
 eq('etld1 www', T.etld1('www.thespacecinema.it'), 'thespacecinema.it');
 eq('etld1 sub', T.etld1('webstore.northsails.com'), 'northsails.com');
 eq('etld1 co.uk', T.etld1('shop.marksandspencer.co.uk'), 'marksandspencer.co.uk');
+// Su myshopify.com ogni negozio è un sottodominio: fermarsi al secondo livello li
+// farebbe passare tutti per lo stesso sito.
+eq('etld1 tenant', T.etld1('www.pasticceriatal.myshopify.com'), 'pasticceriatal.myshopify.com');
+eq('etld1 tenant, negozio diverso', T.etld1('altro.myshopify.com'), 'altro.myshopify.com');
 
 // --- klOffer: record veri dell'API Klarna -----------------------------------
 // Il tasso è in centesimi di punto e il dominio esiste solo dentro otcUrl.
@@ -133,6 +137,23 @@ eq('match: nessun falso positivo', negativi.filter(h => m(h).length), []);
 
 (async () => {
   const has = r => r.offers.length + r.rev.length + r.kl.length;
+
+  // --- rebuild: gli alias manuali devono sopravvivere alla sync ---------------
+  // Erano l'unica parte dell'indice non derivata dal catalogo, e rebuild() la buttava
+  // via a ogni crawl: il collegamento fatto a mano durava fino al giorno dopo.
+  const cat = { offers: { 5: { c: '1', t: 'Wizz Air', d: '', h: '', k: 'none', p: 2 } } };
+
+  store = { aliases: { 'wizzair.com': ['5'] } };
+  await T.rebuild(cat);
+  eq('rebuild: alias riapplicato', store.idx.dom['wizzair.com'], ['5']);
+
+  store = { aliases: { 'sparita.it': ['999'] } };
+  await T.rebuild(cat);
+  eq('rebuild: alias verso offerta non più in catalogo', store.idx.dom['sparita.it'], undefined);
+
+  store = {};
+  await T.rebuild(cat);
+  eq('rebuild: senza alias resta il solo catalogo', Object.keys(store.idx.dom), []);
 
   store = {};
   const vuoto = await T.checkHost('zalando.it');

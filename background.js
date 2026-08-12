@@ -409,19 +409,42 @@ function nameKeys(title) {
 }
 
 const MULTI_SLD = /\.(co|com|org|net|gov|edu|ac)\.[a-z]{2}$/;
+
+// Domini che ospitano negozi diversi uno per sottodominio: qui il sito vero è il terzo
+// livello. Senza questa lista due negozi Shopify distinti darebbero lo stesso etld1, e
+// un alias o un "non c'entra nulla" messo su uno varrebbe per tutti gli altri.
+const TENANT = new Set([
+  "myshopify.com",
+  "github.io",
+  "netlify.app",
+  "vercel.app",
+  "pages.dev",
+  "wixsite.com",
+]);
+
 function etld1(hostname) {
   const h = hostname.replace(/^www\./, "").toLowerCase();
   const p = h.split(".");
   if (p.length <= 2) return h;
-  return MULTI_SLD.test(h) ? p.slice(-3).join(".") : p.slice(-2).join(".");
+  const two = p.slice(-2).join(".");
+  if (TENANT.has(two)) return p.slice(-3).join(".");
+  return MULTI_SLD.test(h) ? p.slice(-3).join(".") : two;
 }
 
 async function rebuild(catalog) {
+  const { aliases = {} } = await get("aliases");
   const dom = {},
     name = {};
   for (const [id, o] of Object.entries(catalog.offers)) {
     if (o.k === "shop" && o.h) (dom[etld1(o.h)] ||= []).push(id);
     for (const k of nameKeys(o.t)) (name[k] ||= []).push(id);
+  }
+  // Gli alias sono l'unica parte dell'indice che non deriva dal catalogo: senza
+  // riapplicarli qui, ogni collegamento fatto a mano dalla dashboard sopravviveva
+  // fino alla sync successiva e poi spariva senza dire niente. Revolut e Klarna lo
+  // facevano già; questa era l'unica fonte a perderli.
+  for (const [d, ids] of Object.entries(aliases)) {
+    for (const id of ids) if (catalog.offers[id]) (dom[d] ||= []).push(id);
   }
   await set({ idx: { dom, name } });
 }
@@ -790,13 +813,14 @@ async function handle(msg) {
 
   if (msg.type === "alias") {
     // collega a mano un'offerta a un dominio
-    const { idx = { dom: {}, name: {} } } = await get("idx");
-    const d = etld1(msg.domain);
-    idx.dom[d] = [...new Set([...(idx.dom[d] || []), msg.id])];
-    await set({ idx });
     const { aliases = {} } = await get("aliases");
+    const d = etld1(msg.domain);
     aliases[d] = [...new Set([...(aliases[d] || []), msg.id])];
     await set({ aliases });
+    // Come revAlias e klAlias: si scrive l'alias e si lascia ricostruire l'indice a
+    // rebuild(), invece di rattoppare idx a mano. Una via sola per arrivarci.
+    const { catalog = { offers: {} } } = await get("catalog");
+    await rebuild(catalog);
     return { ok: true };
   }
 
