@@ -65,6 +65,11 @@ qualcosa va storto ripristina il backup e ti dice cosa è successo.
 L'estensione **non viene mai rimossa**: credenziali, catalogo, alias, segnalazioni e l'icona
 fissata nella barra restano dove sono.
 
+> **La prima volta soltanto** il sistema blocca gli script arrivati da internet. Su macOS
+> ("sviluppatore non identificato"): tasto destro sul file → **Apri** → **Apri**. Su Windows
+> ("Windows ha protetto il PC"): **Ulteriori informazioni** → **Esegui comunque**. Dagli
+> aggiornamenti successivi non succede più, perché i file li scarica lo script e non il browser.
+
 ### A mano, se preferisci
 
 1. scarica il nuovo `discount-check.zip`
