@@ -74,32 +74,40 @@ if ($now -ne $latest) {
 Write-Host ''
 Write-Host "Fatto: ora è la $now."
 Write-Host ''
-Write-Host 'Perché Chrome la carichi davvero va riavviato.'
+
+# Non è detto che il browser sia Chrome: Brave, Edge e Vivaldi caricano la stessa
+# estensione. Si riavvia quello che sta girando davvero, non quello che immaginiamo noi.
+$noti = [ordered]@{
+  'brave'  = 'Brave'
+  'chrome' = 'Google Chrome'
+  'msedge' = 'Microsoft Edge'
+  'vivaldi' = 'Vivaldi'
+}
+$proc = $null
+foreach ($p in $noti.Keys) {
+  $found = Get-Process $p -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($found) { $proc = @{ name = $p; label = $noti[$p]; exe = $found.Path }; break }
+}
+
+if (-not $proc) {
+  Fine "Nessun browser aperto: alla prossima apertura l'estensione sarà già aggiornata."
+}
+
+Write-Host "Perché $($proc.label) la carichi davvero va riavviato."
 Write-Host 'L''estensione NON viene rimossa: credenziali, catalogo e pin restano.'
-$ans = Read-Host 'Riavvio Chrome adesso? [S/n]'
+$ans = Read-Host "Riavvio $($proc.label) adesso? [S/n]"
 
 if ($ans -match '^[nN]') {
-  Fine @"
-Ok. Quando vuoi: chiudi e riapri Chrome, oppure vai su chrome://extensions
-e premi Aggiorna sulla scheda di Discount Check.
-"@
+  Fine "Ok. Quando vuoi: chiudi e riapri $($proc.label), oppure apri la pagina delle estensioni e premi Aggiorna sulla scheda di Discount Check."
 }
 
-Write-Host 'Riavvio Chrome...'
-$exe = (Get-Process chrome -ErrorAction SilentlyContinue | Select-Object -First 1).Path
-if (-not $exe) {
-  $exe = @(
-    "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
-    "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
-    "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
-  ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-}
-# CloseMainWindow e non Kill: Chrome salva la sessione e la riapre se è impostato
+Write-Host "Riavvio $($proc.label)..."
+# CloseMainWindow e non Kill: il browser salva la sessione e la riapre se è impostato
 # su "Continua da dove avevi interrotto".
-Get-Process chrome -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }
+Get-Process $proc.name -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }
 Start-Sleep -Seconds 3
-Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process $proc.name -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1
 
-if ($exe) { Start-Process $exe; Fine 'Riaperto.' }
-Fine 'Chrome chiuso, ma non ho trovato chrome.exe: riaprilo a mano.'
+if ($proc.exe) { Start-Process $proc.exe; Fine 'Riaperto.' }
+Fine "$($proc.label) chiuso, ma non ho trovato l'eseguibile: riaprilo a mano."

@@ -1,6 +1,6 @@
 # Discount Check
 
-Estensione Chrome/Edge (MV3) che ti ricorda gli sconti a cui hai già diritto **mentre stai per
+Estensione (MV3) per **Chrome, Brave, Edge** e gli altri browser Chromium, che ti ricorda gli sconti a cui hai già diritto **mentre stai per
 pagare**, invece di fartene accorgere il giorno dopo.
 
 Tre fonti in una sola riga al checkout:
@@ -23,9 +23,10 @@ Tre fonti in una sola riga al checkout:
 Quando esce una versione nuova la dashboard te lo dice in cima, con un **`!` rosso** sull'icona.
 Non serve scaricare niente da GitHub.
 
-**1. Apri la cartella dell'estensione** — quella che hai scelto quando l'hai caricata in Chrome. Se
-non ti ricordi dov'è: `chrome://extensions` → **Dettagli** su Discount Check → il percorso è scritto
-sotto "Origine".
+**1. Apri la cartella dell'estensione** — quella che hai scelto quando l'hai caricata nel browser. Se
+non ti ricordi dov'è: apri la pagina delle estensioni (`chrome://extensions` su Chrome,
+`brave://extensions` su Brave, `edge://extensions` su Edge) → **Dettagli** su Discount Check → il
+percorso è scritto sotto "Origine".
 
 **2. Doppio clic sullo script:**
 
@@ -34,8 +35,9 @@ sotto "Origine".
 | macOS   | `aggiorna.command` |
 | Windows | `aggiorna.bat`     |
 
-**3. Rispondi sì al riavvio di Chrome.** Serve perché Chrome rilegge le estensioni non pacchettizzate
-solo all'avvio.
+**3. Rispondi sì al riavvio del browser.** Serve perché le estensioni non pacchettizzate vengono
+rilette dal disco solo all'avvio. Lo script riconosce da solo quale browser stai usando — Chrome,
+Brave, Edge, Vivaldi — e riavvia quello.
 
 Lo script scarica l'ultima release, fa un backup della cartella, installa sopra e verifica il
 risultato: se qualcosa va storto ripristina il backup e te lo dice. L'estensione **non viene mai
@@ -44,10 +46,10 @@ dove sono.
 
 > **Non trovi lo script?** Hai una versione precedente alla 1.0.6. Fai un ultimo aggiornamento a
 > mano: scarica [discount-check.zip](https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip),
-> scompattalo **sopra la cartella che usi già**, poi `chrome://extensions` → **Aggiorna**. Dalla
+> scompattalo **sopra la cartella che usi già**, poi pagina delle estensioni → **Aggiorna**. Dalla
 > prossima volta ci pensa lo script.
 
-> ⚠️ **Non usare "Rimuovi" e poi ricaricare.** Quando rimuovi un'estensione Chrome cancella anche il
+> ⚠️ **Non usare "Rimuovi" e poi ricaricare.** Quando rimuovi un'estensione il browser cancella anche il
 > suo `chrome.storage.local`: perdi credenziali, catalogo e segnalazioni. Stessa cosa se sposti la
 > cartella: l'ID dell'estensione dipende dal percorso.
 
@@ -80,13 +82,14 @@ Scaricano e scompattano in `Documenti/discount-check`, poi aprono la cartella.
 > aperto con **tasto destro → Apri** (macOS) o **Ulteriori informazioni → Esegui comunque**
 > (Windows).
 
-### 2. Caricala in Chrome
+### 2. Caricala nel browser
 
-1. apri `chrome://extensions`
+1. apri la pagina delle estensioni: `chrome://extensions` su Chrome, `brave://extensions` su Brave,
+   `edge://extensions` su Edge
 2. attiva **Modalità sviluppatore** (in alto a destra)
 3. **Carica estensione non pacchettizzata** → seleziona `Documenti/discount-check`
 
-Chrome carica l'estensione **da quella cartella**, non ne fa una copia: non spostarla e non
+Il browser carica l'estensione **da quella cartella**, non ne fa una copia: non spostarla e non
 cancellarla.
 
 ### 3. Inserisci le credenziali del portale
@@ -209,7 +212,7 @@ Tarato per **preferire i falsi positivi**: un promemoria di troppo si chiude, un
 ## Distribuzione
 
 Niente Chrome Web Store: ogni push su `main` fa girare [release.yml](.github/workflows/release.yml),
-che impacchetta `discount-check.zip` (solo i file che Chrome carica) e lo pubblica su GitHub
+che impacchetta `discount-check.zip` (solo i file che il browser carica) e lo pubblica su GitHub
 Releases con tag `v<version del manifest>`.
 
 Il tag **è** la version di `manifest.json`. Se non la bumpi, la release esistente viene riscritta

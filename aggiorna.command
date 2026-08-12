@@ -84,26 +84,44 @@ fi
 echo
 echo "Fatto: ora è la $NOW."
 echo
-echo "Perché Chrome la carichi davvero va riavviato."
+
+# Non è detto che il browser sia Chrome: Brave, Edge e Chromium caricano la stessa
+# estensione. Si riavvia quello che sta girando davvero, non quello che immaginiamo noi.
+BROWSER=""
+for b in "Brave Browser" "Google Chrome" "Microsoft Edge" "Chromium" "Vivaldi" "Opera"; do
+  if pgrep -x "$b" >/dev/null 2>&1; then
+    BROWSER="$b"
+    break
+  fi
+done
+
+if [ -z "$BROWSER" ]; then
+  echo "Nessun browser aperto: alla prossima apertura l'estensione sarà già aggiornata."
+  echo
+  read -r -p "Premi Invio per chiudere. "
+  exit 0
+fi
+
+echo "Perché $BROWSER la carichi davvero va riavviato."
 echo "L'estensione NON viene rimossa: credenziali, catalogo e pin restano."
-read -r -p "Riavvio Chrome adesso? [S/n] " ANS
+read -r -p "Riavvio $BROWSER adesso? [S/n] " ANS
 
 case "${ANS:-S}" in
   [nN]*)
     echo
-    echo "Ok. Quando vuoi: chiudi e riapri Chrome, oppure vai su chrome://extensions"
-    echo "e premi Aggiorna sulla scheda di Discount Check."
+    echo "Ok. Quando vuoi: chiudi e riapri $BROWSER, oppure apri la pagina delle"
+    echo "estensioni e premi Aggiorna sulla scheda di Discount Check."
     ;;
   *)
-    echo "Riavvio Chrome..."
-    # 'quit' e non kill: Chrome salva la sessione e la riapre se è impostato su
+    echo "Riavvio $BROWSER..."
+    # 'quit' e non kill: il browser salva la sessione e la riapre se è impostato su
     # "Continua da dove avevi interrotto".
-    osascript -e 'tell application "Google Chrome" to quit' 2>/dev/null || true
+    osascript -e "tell application \"$BROWSER\" to quit" 2>/dev/null || true
     for _ in $(seq 1 20); do
-      pgrep -x "Google Chrome" >/dev/null || break
+      pgrep -x "$BROWSER" >/dev/null || break
       sleep 0.5
     done
-    open -a "Google Chrome"
+    open -a "$BROWSER"
     echo "Riaperto."
     ;;
 esac

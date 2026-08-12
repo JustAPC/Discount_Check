@@ -39,17 +39,18 @@ jobs:
 
           **1. Non ricordi dov'è quella cartella?**
 
-          Apri `chrome://extensions` (incollalo nella barra degli indirizzi), premi **Dettagli**
-          sulla scheda di Discount Check e leggi il percorso sotto **Origine**. Comodo: dalla
-          dashboard dell'estensione, l'avviso di aggiornamento ha un link che ti apre quella pagina
-          da solo.
+          Apri la pagina delle estensioni — `chrome://extensions` su Chrome, `brave://extensions` su
+          Brave, `edge://extensions` su Edge — premi **Dettagli** sulla scheda di Discount Check e
+          leggi il percorso sotto **Origine**. Comodo: dalla dashboard dell'estensione, l'avviso di
+          aggiornamento ha un link che ti apre quella pagina da solo.
 
           **2. Apri la cartella e fai doppio clic su:**
 
           - **macOS** → `aggiorna.command`
           - **Windows** → `aggiorna.bat`
 
-          **3. Rispondi sì al riavvio di Chrome.**
+          **3. Rispondi sì al riavvio del browser.** Lo script riconosce da solo quale stai usando —
+          Chrome, Brave, Edge, Vivaldi — e riavvia quello.
 
           Lo script scarica la versione nuova, fa un backup della cartella e installa sopra.
           L'estensione **non viene rimossa**: credenziali, catalogo, alias e l'icona fissata nella
@@ -77,7 +78,8 @@ jobs:
           $d="$env:USERPROFILE\Documents\discount-check"; mkdir $d -Force | Out-Null; Invoke-WebRequest https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip -OutFile "$env:TEMP\dc.zip"; Expand-Archive "$env:TEMP\dc.zip" $d -Force; explorer $d
           ```
 
-          Poi: `chrome://extensions` → **Modalità sviluppatore** → **Carica estensione non
+          Poi: pagina delle estensioni (`chrome://extensions`, `brave://extensions`,
+          `edge://extensions`) → **Modalità sviluppatore** → **Carica estensione non
           pacchettizzata** → scegli `Documenti/discount-check`. Infine apri la dashboard →
           **Accesso al portale** → email e password → **Salva** → **Aggiorna tutto**.
 
