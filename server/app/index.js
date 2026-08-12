@@ -84,8 +84,12 @@ async function ingest(body) {
     if (!parsed || !key) { skipped.push(o.name || '(senza nome)'); continue; }
 
     // first_seen si conserva: serve a distinguere un'offerta nuova da una che rientra.
-    // domain assente non azzera quello già salvato: un alias impostato a mano sopravvive
-    // agli ingest successivi.
+    //
+    // Il dominio salvato vince sempre su quello dell'ingest: è l'unico campo che non
+    // arriva dagli screenshot ma da una decisione presa guardando il sito vero, e la
+    // skill lo *propone* al passo 4, dove un "ok" distratto lo sostituirebbe in
+    // silenzio. Qui l'ingest può solo riempire un vuoto; per correggere un dominio
+    // sbagliato c'è POST /revolut/domains, che è esplicito per costruzione.
     await pool.execute(
       `INSERT INTO revolut_offer
          (name, name_key, kind, rate, badge_raw, boosted, channel, domain, active, first_seen, last_seen)
@@ -93,7 +97,7 @@ async function ingest(body) {
        ON DUPLICATE KEY UPDATE
          name = VALUES(name), kind = VALUES(kind), rate = VALUES(rate),
          badge_raw = VALUES(badge_raw), boosted = VALUES(boosted),
-         domain = COALESCE(VALUES(domain), domain),
+         domain = COALESCE(domain, VALUES(domain)),
          active = 1, last_seen = VALUES(last_seen)`,
       [o.name, key, parsed.kind, parsed.rate, o.badge_raw, o.boosted ? 1 : 0,
        o.channel || 'online', cleanDomain(o.domain), day, day]
@@ -112,6 +116,34 @@ async function ingest(body) {
     }
   }
   return { upserted, deactivated, skipped };
+}
+
+// Il dominio è ciò che aggancia il negozio al sito su cui stai comprando, ed è l'unico
+// campo che non si legge da uno screenshot: lo si decide guardando dove si compra
+// davvero. Sta qui e non dentro l'ingest perché l'ingest pretende anche il badge, e
+// per correggere "itaairways" non si dovrebbe essere costretti a riscriverne il tasso.
+//
+// Prende { name_key: dominio }. Un valore vuoto o null cancella il dominio, così
+// "l'ho messo sbagliato" si disfa senza aprire il database.
+async function setDomains(body) {
+  const set = [];
+  const unset = [];
+  const unknown = [];
+
+  for (const [rawKey, rawDom] of Object.entries(body || {})) {
+    const key = nameKey(rawKey);
+    if (!key) continue;
+    const dom = cleanDomain(rawDom);
+    const [res] = await pool.execute(
+      `UPDATE revolut_offer SET domain = ? WHERE name_key = ?`, [dom, key]
+    );
+    // Nessuna riga toccata = chiave che non esiste. Va detto: e' quasi sempre un nome
+    // scritto a mano che non corrisponde a nessun negozio, e in silenzio sembrerebbe
+    // riuscito.
+    if (!res.affectedRows) unknown.push(key);
+    else (dom ? set : unset).push(key);
+  }
+  return { set, unset, unknown };
 }
 
 // --- server ----------------------------------------------------------------
@@ -155,6 +187,14 @@ http.createServer(async (req, res) => {
         return send(res, 403, { error: 'token non valido' });
       }
       return send(res, 200, await ingest(await readJson(req)));
+    }
+
+    if (req.method === 'POST' && url.pathname === '/revolut/domains') {
+      if (!TOKEN) return send(res, 503, { error: 'INGEST_TOKEN non configurato' });
+      if (req.headers['x-ingest-token'] !== TOKEN) {
+        return send(res, 403, { error: 'token non valido' });
+      }
+      return send(res, 200, await setDomains(await readJson(req)));
     }
 
     send(res, 404, { error: 'not found' });

@@ -13,7 +13,24 @@ utile è che uno screenshot parziale non può cancellare offerte vive.
 |---|---|---|
 | `GET` | `/revolut/offers` | offerte attive, `instore` escluse, ordinate per `rate`, con `label` già pronta (`20x`) |
 | `POST` | `/revolut/ingest` | `{captured_at, upsert:[…], deactivate:[…]}`, header `X-Ingest-Token` |
+| `POST` | `/revolut/domains` | `{name_key: dominio}`, header `X-Ingest-Token`. Scrive e corregge i domini |
 | `GET` | `/health` | ping al DB, usato dall'healthcheck |
+
+Il **dominio** ha una regola sua, diversa da tutti gli altri campi: è l'unico che non arriva
+dagli screenshot ma da una decisione presa guardando dove si compra davvero, quindi
+`/revolut/ingest` può solo riempirlo dove è vuoto — `COALESCE(domain, VALUES(domain))` — e
+non lo sovrascrive mai. La skill lo *propone* al passo 4, dove un "ok" distratto lo
+sostituirebbe in silenzio.
+
+Per scriverlo o correggerlo c'è `/revolut/domains`, che accetta il `name_key` o il nome
+visibile, un dominio nudo o un URL intero, e una stringa vuota per cancellarlo. Risponde
+`{set, unset, unknown}`: `unknown` sono le chiavi che non corrispondono a nessun negozio.
+
+```bash
+curl -s -X POST "$SCONTI_API/revolut/domains" \
+  -H "X-Ingest-Token: $INGEST_TOKEN" -H 'content-type: application/json' \
+  -d '{"itaairways": "ita-airways.com"}'
+```
 
 Body di ingest:
 

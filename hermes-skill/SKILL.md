@@ -133,6 +133,14 @@ Regole:
 - il `?` marca le proposte su cui non sei sicuro: è lì che Andrea guarda per primo;
 - il **dominio** è la colonna che conta davvero, perché è ciò che aggancia il negozio al sito
   su cui sta comprando. Se non lo sai, lascia la cella vuota invece di inventare;
+- **un dominio già a catalogo non si tocca e non si ripropone.** Lo stato del passo 1 lo
+  contiene: prima di scrivere qualcosa in quella colonna, guardalo. Se il negozio ce l'ha
+  già, scrivilo come `= dominio` per far vedere che resta com'è. Se quello che avresti
+  proposto è **diverso** da quello salvato, non sceglierlo tu: portalo come discrepanza,
+  perché il dominio salvato è una decisione presa guardando il sito vero, mentre il tuo è
+  una deduzione dal nome. Il server comunque rifiuta di sovrascriverlo — l'ingest può solo
+  riempire un vuoto — quindi proporlo senza dirlo produrrebbe solo un "ok" che non fa
+  niente, e la sensazione sbagliata di aver corretto qualcosa;
 - se una card resta ambigua dopo la risposta, si scarta: meglio un negozio in meno che una
   riga sbagliata in un catalogo che consiglia la carta al checkout.
 
@@ -179,13 +187,44 @@ curl -s -X POST "$SCONTI_API/revolut/ingest" \
 Il server risponde `{upserted, deactivated, skipped}`. Riportare i numeri, e se `skipped`
 non è vuoto elencare i nomi: significa che il badge non è stato interpretato.
 
+## Correggere un dominio
+
+Il dominio è ciò che aggancia il negozio al sito su cui Andrea sta comprando, ed è l'unico
+campo che non si legge da uno screenshot: si decide guardando dove si compra davvero. Quando
+è giusto, l'estensione smette di indovinare per nome su quel negozio — ed è così che si
+evitano scambi come "Qatar Airways" mostrato su `ita-airways.com`.
+
+Si scrive da solo, senza toccare tassi né badge:
+
+```bash
+curl -s -X POST "$SCONTI_API/revolut/domains" \
+  -H "X-Ingest-Token: $INGEST_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{
+    "itaairways": "ita-airways.com",
+    "qatarairways": "https://www.qatarairways.com/it-it/homepage"
+  }'
+```
+
+- la chiave può essere il `name_key` o il nome visibile del negozio: il server normalizza;
+- il valore può essere un dominio nudo o un URL intero incollato dalla barra: il server tiene
+  solo l'host e toglie `www.`;
+- valore vuoto o `null` **cancella** il dominio, per disfare una scrittura sbagliata;
+- risponde `{set, unset, unknown}`. **`unknown` va sempre riportato ad Andrea**: sono chiavi
+  che non corrispondono a nessun negozio, quasi sempre un nome scritto a mano, e in silenzio
+  sembrerebbe che l'operazione sia riuscita.
+
+La modifica arriva a tutte le estensioni entro 24 ore da sola, o subito se Andrea preme
+**Aggiorna tutto** o **Aggiorna Revolut**. Non serve pubblicare niente.
+
 ## Note
 
 - Il server deriva da sé `name_key`, `kind` e `rate` da `name` e `badge_raw`. Non calcolarli
   qui: la regola sta in un posto solo.
-- `domain` è **opzionale**: mandalo solo quando lo sai (Andrea l'ha indicato, o il nome del
-  negozio non assomiglia al suo sito). Se lo ometti, un dominio già salvato resta dov'è: il
-  server non lo azzera.
+- `domain` è **opzionale** e l'ingest può solo riempirlo dove è vuoto: un dominio già
+  salvato vince sempre, che tu lo ometta o che ne mandi uno diverso. Mandalo quando lo sai
+  e il negozio non ce l'ha ancora; per **correggerne** uno sbagliato serve l'endpoint
+  dedicato qui sotto, che è esplicito per costruzione.
 - `channel: "instore"` si salva ma l'estensione non lo usa. Vale la pena mandarlo comunque.
 - Pillow assente in ambiente PEP 668 (installazione di sistema protetta): non insistere con
   `pip install`, usa un venv usa e getta —
