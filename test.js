@@ -2,7 +2,8 @@
 const fs = require('fs');
 const vm = require('vm');
 
-const src = fs.readFileSync('C:/Users/Andrea/Downloads/cb-reminder/background.js', 'utf8');
+const path = require('path');
+const src = fs.readFileSync(path.join(__dirname, 'background.js'), 'utf8');
 const noop = () => {};
 const listener = { addListener: noop };
 const ctx = {
@@ -36,7 +37,13 @@ const html = `
 <button data-href="https&#x3A;&#x2F;&#x2F;partners.rentalcar.com&#x2F;it&#x3F;a&#x3D;1&amp;b&#x3D;2">Shop online</button>`;
 eq('parseOffer HTML-encoded + KM',
   T.parseOffer(html, '/offer/123/cat/45'),
-  { id: '123', v: { c: '45', t: 'Alamo Autonoleggio', d: '< 20% Sconto', h: 'partners.rentalcar.com', k: 'shop' } });
+  { id: '123', v: { c: '45', t: 'Alamo Autonoleggio', d: '< 20% Sconto', h: 'partners.rentalcar.com', k: 'shop', p: 2 } });
+
+// 4) il portale risponde con la home invece della scheda: va scartata, non salvata
+const HOME = 'I tuoi AlmavivA s.p.a. offerte per dipendenti';
+const homeHtml = `<h1>${HOME}</h1><span class="cbg3-discount-and-location--uppercase">< 50% Sconto</span>`;
+eq('parseOffer scarta la home', T.parseOffer(homeHtml, '/offer/123/cat/45', HOME), null);
+eq('parseOffer tiene la scheda vera', T.parseOffer(html, '/offer/123/cat/45', HOME).v.t, 'Alamo Autonoleggio');
 
 const gc = `<h1>Apple Gift Card</h1><span class="cbg3-discount-and-location--uppercase">5% Sconto</span>
 <button data-href="https://it.vouchers-at-work.com/">Shop online</button>`;
