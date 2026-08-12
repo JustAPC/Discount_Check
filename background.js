@@ -29,7 +29,11 @@ const set = (o) => chrome.storage.local.set(o);
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("daily", { periodInMinutes: 1440, delayInMinutes: 1 });
   chrome.alarms.create("resume", { periodInMinutes: 1 });
+  // Tutte e tre le fonti, non solo il portale: appena installata l'estensione deve
+  // essere utile subito, senza aspettare l'alarm giornaliero o i bottoni singoli.
   sync();
+  syncRevolut();
+  syncKlarna();
   checkUpdate();
 });
 
@@ -422,6 +426,9 @@ async function rebuild(catalog) {
 // Endpoint e credenziali stanno in storage, mai nel codice: il repo resta pubblicabile.
 
 async function syncRevolut() {
+  // Lo stato lo mette la sync stessa, non chi la chiama: così "Aggiorna tutto",
+  // il bottone singolo e l'alarm giornaliero si vedono tutti in dashboard.
+  await set({ revSync: { state: "running", at: Date.now() } });
   try {
     // Nessun header custom: niente credenziali nel browser, niente preflight CORS.
     const r = await fetch(REVOLUT_API + "/revolut/offers");
@@ -494,6 +501,7 @@ function klOffer(s) {
 }
 
 async function syncKlarna() {
+  await set({ klSync: { state: "running", at: Date.now() } });
   try {
     // Klarna elenca lo stesso brand più volte con tassi diversi ("G-Star Raw" 4% e
     // "G Star RAW" 2%): stessa chiave, si tiene il tasso migliore.

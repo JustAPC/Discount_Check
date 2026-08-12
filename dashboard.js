@@ -38,6 +38,10 @@ function act(name, label, fn) {
 
 // --- stato -----------------------------------------------------------------
 
+// Il service worker MV3 può morire a metà sync e lasciare lo stato su "running" per
+// sempre: dopo due minuti lo si considera finito, così la dashboard non gira a vuoto.
+const busy = (s) => !!s && s.state === 'running' && Date.now() - (s.at || 0) < 120000;
+
 async function refresh() {
   const next = await send({ type: 'state' });
   // Il service worker MV3 viene terminato spesso: se non risponde va detto, non lasciato in bianco.
@@ -45,7 +49,9 @@ async function refresh() {
   S = next;
   live = true;
   const st = S.sync || {};
-  const running = st.state === 'running';
+  // "Aggiorna tutto" muove tutte e tre le fonti: finché una lavora il bottone resta
+  // occupato e il polling continua, altrimenti Revolut e Klarna finivano in silenzio.
+  const running = st.state === 'running' || busy(S.revSync) || busy(S.klSync);
 
   $('dot').className = 'dot' + (running ? ' run' : st.state === 'login' ? ' warn'
     : st.state === 'error' ? ' err' : '');
@@ -312,9 +318,11 @@ function renderCatalog() {
 
 function renderRevolut(list) {
   const rs = S.revSync || {};
-  $('rev-sub').textContent = rs.state === 'error'
-    ? `ultimo tentativo fallito: ${rs.error}`
-    : `aggiornato ${fmt((S.revolut || {}).at)}`;
+  $('rev-sub').textContent = busy(rs)
+    ? 'aggiornamento in corso…'
+    : rs.state === 'error'
+      ? `ultimo tentativo fallito: ${rs.error}`
+      : `aggiornato ${fmt((S.revolut || {}).at)}`;
 
   const box = $('rev-list');
   box.innerHTML = '';
@@ -330,9 +338,11 @@ function renderRevolut(list) {
 
 function renderKlarna(list) {
   const ks = S.klSync || {};
-  $('kl-sub').textContent = ks.state === 'error'
-    ? `ultimo tentativo fallito: ${ks.error}`
-    : `aggiornato ${fmt((S.klarna || {}).at)}`;
+  $('kl-sub').textContent = busy(ks)
+    ? 'aggiornamento in corso…'
+    : ks.state === 'error'
+      ? `ultimo tentativo fallito: ${ks.error}`
+      : `aggiornato ${fmt((S.klarna || {}).at)}`;
 
   const box = $('kl-list');
   box.innerHTML = '';
