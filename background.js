@@ -1,8 +1,9 @@
-// CB Reminder - service worker: crawl del portale, indici, matching.
+// Discount Check - service worker: crawl del portale, indici, matching.
 const PORTAL = 'https://almaviva.convenzioniaziendali.it';
 // Catalogo Revolut, servito da sconti-api. Sola lettura e nessun segreto: sta qui.
 const REVOLUT_API = 'https://sconti-api.andreapontillo.tech';
 const CONC = 4;            // fetch in parallelo durante il crawl
+const PARSE_V = 2;         // versione di parseOffer: bumpala e la sync ri-scarica tutto
 const SAVE_EVERY = 10;     // batch tra un salvataggio e l'altro
 const SNOOZE_MS = 2 * 60 * 60 * 1000;
 const NUDGE_MS = 24 * 60 * 60 * 1000;
@@ -66,6 +67,10 @@ async function sync() {
     const home = await fetchText('/');
     const cats = [...new Set([...home.matchAll(/\/overview\/(\d+)/g)].map(m => m[1]))];
 
+    // È successo: il portale ha risposto home su ogni /offer/... e il catalogo è finito
+    // con 132 offerte tutte uguali. Il titolo della home fa da sentinella per scartarle.
+    const homeTitle = h1(home);
+
     const paths = new Set();
     for (const c of cats) {
       const h = await fetchText('/overview/' + c);
@@ -78,12 +83,13 @@ async function sync() {
     for (const p of paths) {
       const id = p.split('/')[2];
       live.add(id);
-      if (!catalog.offers[id]) queue.push(p);
+      const cur = catalog.offers[id];
+      if (!cur || cur.p !== PARSE_V) queue.push(p);
     }
     for (const id of Object.keys(catalog.offers)) if (!live.has(id)) delete catalog.offers[id];
 
     await set({
-      catalog, queue,
+      catalog, queue, homeTitle,
       sync: { state: 'running', phase: 'offerte', total: queue.length, done: 0 }
     });
     running = false;
@@ -98,7 +104,8 @@ async function drain() {
   if (running) return;
   running = true;
   try {
-    let { queue = [], catalog = { offers: {} }, sync: st = {} } = await get(['queue', 'catalog', 'sync']);
+    let { queue = [], catalog = { offers: {} }, sync: st = {}, homeTitle = '' } =
+      await get(['queue', 'catalog', 'sync', 'homeTitle']);
     const total = st.total || queue.length;
     let n = 0;
 
@@ -115,7 +122,7 @@ async function drain() {
           throw err;
         }
         if (html) {
-          const o = parseOffer(html, p);
+          const o = parseOffer(html, p, homeTitle);
           if (o) catalog.offers[o.id] = o.v;
         }
       }
@@ -158,13 +165,17 @@ const dec = s => String(s || '')
 
 const strip = s => dec(String(s || '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
 
-function parseOffer(html, path) {
+const h1 = html => strip((/<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html) || [])[1]);
+
+function parseOffer(html, path, homeTitle) {
   const m = /\/offer\/(\d+)\/cat\/(\d+)/.exec(path);
   if (!m) return null;
   const [, id, cat] = m;
 
-  const title = strip((/<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html) || [])[1]);
-  if (!title) return null;
+  const title = h1(html);
+  // Titolo uguale alla home: non è la scheda offerta. Meglio nessuna riga che una sbagliata,
+  // e senza id in catalogo la prossima sync ci riprova.
+  if (!title || (homeTitle && title === homeTitle)) return null;
 
   // Stessa classe è usata per lo sconto e per la distanza ("ca. 15.4 KM"): tieni la percentuale.
   let disc = '';
@@ -188,7 +199,7 @@ function parseOffer(html, path) {
     kind = VOUCHER_SHOP.test(host) ? 'giftcard' : AFFILIATE.test(host) ? 'affiliate' : 'shop';
     break;
   }
-  return { id, v: { c: cat, t: title, d: disc, h: host, k: kind } };
+  return { id, v: { c: cat, t: title, d: disc, h: host, k: kind, p: PARSE_V } };
 }
 
 // --- indici ----------------------------------------------------------------
