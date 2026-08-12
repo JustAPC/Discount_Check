@@ -413,6 +413,12 @@ function renderUpdate() {
   // L'estensione non può aprire il Finder né conoscere la propria cartella su disco:
   // l'unica cosa utile che può fare è dire il gesto esatto. Il resto sta nella guida.
   $('upd-txt').textContent = `Versione ${u.version} disponibile — hai la ${S.version}`;
+  // Un <a href="chrome://…"> non naviga: le pagine non possono linkare quello schema.
+  // Da un'estensione però chrome.tabs.create lo apre, e non serve il permesso "tabs".
+  $('upd-ext').onclick = (e) => {
+    e.preventDefault();
+    chrome.tabs.create({ url: 'chrome://extensions' });
+  };
 }
 
 // --- credenziali del portale ---------------------------------------------------

@@ -34,14 +34,26 @@ jobs:
           cat > notes.md <<'EOF'
           ## Hai già Discount Check installato?
 
-          Non scaricare niente da qui. Apri la cartella dell'estensione e fai doppio clic su:
+          Non scaricare niente da qui: l'aggiornamento è un doppio clic dentro la cartella che usi
+          già.
+
+          **1. Non ricordi dov'è quella cartella?**
+
+          Apri `chrome://extensions` (incollalo nella barra degli indirizzi), premi **Dettagli**
+          sulla scheda di Discount Check e leggi il percorso sotto **Origine**. Comodo: dalla
+          dashboard dell'estensione, l'avviso di aggiornamento ha un link che ti apre quella pagina
+          da solo.
+
+          **2. Apri la cartella e fai doppio clic su:**
 
           - **macOS** → `aggiorna.command`
           - **Windows** → `aggiorna.bat`
 
-          Scarica la versione nuova, la installa e ti propone di riavviare Chrome. L'estensione
-          **non viene rimossa**: credenziali, catalogo, alias e l'icona fissata nella barra restano
-          dove sono.
+          **3. Rispondi sì al riavvio di Chrome.**
+
+          Lo script scarica la versione nuova, fa un backup della cartella e installa sopra.
+          L'estensione **non viene rimossa**: credenziali, catalogo, alias e l'icona fissata nella
+          barra restano dove sono.
 
           > Non trovi lo script? Vuol dire che hai una versione precedente alla 1.0.6: fai questo
           > aggiornamento a mano come sotto, una volta sola, e dalla prossima ci pensa lo script.
