@@ -451,8 +451,14 @@
         font-size: 11px;
         color: var(--ink-3);
       }
+      /* Il taglio più netto della superficie: sopra c'è il sito su cui sei adesso, sotto
+         il catalogo e la manutenzione. Il filetto esce dal padding di main e tocca i due
+         bordi, perché una riga inset si legge come l'ennesimo separatore di riga. Dentro
+         il blocco i filetti restano tenui: soft dentro, pieno al confine. */
       #here {
-        margin-bottom: 14px;
+        margin: 0 -14px;
+        padding: 0 14px 16px;
+        border-bottom: 1px solid var(--line);
       }
       #here[hidden] {
         display: none;
