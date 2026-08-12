@@ -50,9 +50,22 @@ Da qui in poi non devi fare più nulla: l'aggiornamento è automatico ogni 24 or
 
 ---
 
-## Aggiornare l'estensione senza perdere i dati
+## Aggiornare l'estensione
 
 Quando esce una versione nuova la dashboard te lo dice in cima, con un **`!` rosso** sull'icona.
+Da lì in poi è un doppio clic: nella cartella dell'estensione trovi
+
+- **macOS** → `aggiorna.command`
+- **Windows** → `aggiorna.bat`
+
+Lo script scarica l'ultima release, fa un backup della cartella, installa sopra e ti propone di
+riavviare Chrome (serve perché Chrome rilegge le estensioni non pacchettizzate solo all'avvio). Se
+qualcosa va storto ripristina il backup e ti dice cosa è successo.
+
+L'estensione **non viene mai rimossa**: credenziali, catalogo, alias, segnalazioni e l'icona
+fissata nella barra restano dove sono.
+
+### A mano, se preferisci
 
 1. scarica il nuovo `discount-check.zip`
 2. scompattalo **sopra la cartella esistente**, sostituendo i file
@@ -60,8 +73,8 @@ Quando esce una versione nuova la dashboard te lo dice in cima, con un **`!` ros
 
 > ⚠️ **Non usare "Rimuovi" e poi "Carica estensione non pacchettizzata".** Quando rimuovi
 > un'estensione Chrome cancella anche il suo `chrome.storage.local`: perdi credenziali, catalogo,
-> alias e segnalazioni, e devi rifare tutto da capo. Sostituire i file + **Aggiorna** lascia tutto
-> al suo posto.
+> alias e segnalazioni, e devi rifare tutto da capo. Vale anche per la cartella: l'ID
+> dell'estensione dipende dal percorso, quindi spostarla altrove equivale a reinstallarla da zero.
 
 ---
 
@@ -189,6 +202,8 @@ uno sconto vale più che sapere che c'è un aggiornamento.
 | `content.js`        | rilevamento checkout + overlay (Shadow DOM)                                 |
 | `dashboard.html/js` | stato sync, ricerca catalogo, alias, segnalazioni, mute                     |
 | `test.js`           | test delle funzioni di parsing e matching (`node test.js`)                  |
+| `aggiorna.command`  | aggiornamento in place su macOS (doppio clic dalla cartella)                |
+| `aggiorna.bat/.ps1` | lo stesso su Windows                                                        |
 | `server/`           | `sconti-api`: il servizio che tiene il catalogo Revolut (Docker su TrueNAS) |
 | `hermes-skill/`     | skill Hermes che legge gli screenshot Revolut e riempie il catalogo         |
 

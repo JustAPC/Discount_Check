@@ -28,14 +28,47 @@ jobs:
             -x '.git/*' '.github/*' 'dist/*' 'server/*' 'hermes-skill/*' \
                '.impeccable/*' '*.md' 'test.js' '.gitignore' '.prettierrc*'
 
+      # Chi clicca l'avviso di aggiornamento atterra qui: le note sono la guida,
+      # non un changelog. Chi ha già l'estensione non deve scaricare nulla.
+      - run: |
+          cat > notes.md <<'EOF'
+          ## Hai già Discount Check installato?
+
+          Non scaricare niente da qui. Apri la cartella dell'estensione e fai doppio clic su:
+
+          - **macOS** → `aggiorna.command`
+          - **Windows** → `aggiorna.bat`
+
+          Scarica la versione nuova, la installa e ti propone di riavviare Chrome. L'estensione
+          **non viene rimossa**: credenziali, catalogo, alias e l'icona fissata nella barra restano
+          dove sono.
+
+          > Non trovi lo script? Vuol dire che hai una versione precedente alla 1.0.6: fai questo
+          > aggiornamento a mano come sotto, una volta sola, e dalla prossima ci pensa lo script.
+
+          ## Prima installazione (o aggiornamento a mano)
+
+          1. scarica `discount-check.zip` qui sotto
+          2. scompattalo in una cartella che non sposterai (non quella dei Download)
+          3. `chrome://extensions` → **Modalità sviluppatore** → **Carica estensione non pacchettizzata** → scegli quella cartella
+          4. apri la dashboard → **Accesso al portale** → email e password → **Salva** → **Aggiorna tutto**
+
+          Se stai aggiornando a mano: scompatta **sopra la cartella che usi già**, poi
+          `chrome://extensions` → **Aggiorna**.
+
+          > ⚠️ Non usare **Rimuovi** e poi ricaricare: Chrome cancella lo storage dell'estensione e
+          > perdi credenziali, catalogo e segnalazioni.
+
+          [Guida completa](https://justapc.github.io/Discount_Check/)
+          EOF
+
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="v${{ steps.v.outputs.v }}"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" dist/discount-check.zip --clobber
+            gh release edit "$tag" --notes-file notes.md
           else
-            gh release create "$tag" dist/discount-check.zip \
-              --title "$tag" \
-              --notes 'Scarica `discount-check.zip`, scompattalo, e da `chrome://extensions` premi **Aggiorna** sulla scheda dell'"'"'estensione (o ricaricala con "Carica estensione non pacchettizzata" se è la prima volta).'
+            gh release create "$tag" dist/discount-check.zip --title "$tag" --notes-file notes.md
           fi
