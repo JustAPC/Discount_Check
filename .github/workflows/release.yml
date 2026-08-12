@@ -46,25 +46,36 @@ jobs:
           > Non trovi lo script? Vuol dire che hai una versione precedente alla 1.0.6: fai questo
           > aggiornamento a mano come sotto, una volta sola, e dalla prossima ci pensa lo script.
 
-          **La prima volta soltanto**, il sistema può bloccare uno script arrivato da internet:
+          ## Prima installazione
 
-          - **macOS** → "impossibile aprire perché proviene da uno sviluppatore non identificato":
-            tasto destro sul file → **Apri** → **Apri**. Dalla seconda volta in poi il doppio clic
-            funziona e basta
-          - **Windows** → "Windows ha protetto il PC": **Ulteriori informazioni** → **Esegui comunque**
+          Non scaricare lo zip dal browser: i file arriverebbero marcati come "provenienti da
+          internet" e al primo doppio clic sullo script macOS direbbe che _potrebbe contenere
+          malware_ (e Windows mostrerebbe SmartScreen). Con una riga di comando il problema non si
+          pone.
 
-          ## Prima installazione (o aggiornamento a mano)
+          **macOS** — apri Terminale e incolla:
 
-          1. scarica `discount-check.zip` qui sotto
-          2. scompattalo in una cartella che non sposterai (non quella dei Download)
-          3. `chrome://extensions` → **Modalità sviluppatore** → **Carica estensione non pacchettizzata** → scegli quella cartella
-          4. apri la dashboard → **Accesso al portale** → email e password → **Salva** → **Aggiorna tutto**
+          ```bash
+          mkdir -p ~/Documents/discount-check && curl -sL -o /tmp/dc.zip https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip && unzip -oq /tmp/dc.zip -d ~/Documents/discount-check && open ~/Documents/discount-check
+          ```
 
-          Se stai aggiornando a mano: scompatta **sopra la cartella che usi già**, poi
-          `chrome://extensions` → **Aggiorna**.
+          **Windows** — apri PowerShell e incolla:
+
+          ```powershell
+          $d="$env:USERPROFILE\Documents\discount-check"; mkdir $d -Force | Out-Null; Invoke-WebRequest https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip -OutFile "$env:TEMP\dc.zip"; Expand-Archive "$env:TEMP\dc.zip" $d -Force; explorer $d
+          ```
+
+          Poi: `chrome://extensions` → **Modalità sviluppatore** → **Carica estensione non
+          pacchettizzata** → scegli `Documenti/discount-check`. Infine apri la dashboard →
+          **Accesso al portale** → email e password → **Salva** → **Aggiorna tutto**.
 
           > ⚠️ Non usare **Rimuovi** e poi ricaricare: Chrome cancella lo storage dell'estensione e
-          > perdi credenziali, catalogo e segnalazioni.
+          > perdi credenziali, catalogo e segnalazioni. Non spostare la cartella: l'ID dipende dal
+          > percorso.
+
+          Se scarichi lo zip a mano da qui, funziona lo stesso — ma la prima volta lo script va
+          aperto con tasto destro → **Apri** su macOS, o **Ulteriori informazioni** → **Esegui
+          comunque** su Windows.
 
           [Guida completa](https://justapc.github.io/Discount_Check/)
           EOF

@@ -66,6 +66,12 @@ cp -R "$DIR" "$TMP/backup"
 echo "Installo..."
 unzip -oq "$TMP/new.zip" -d "$DIR"
 
+# Se questo zip fosse stato scaricato dal browser, macOS marcherebbe i file come
+# provenienti da internet e al prossimo giro Gatekeeper bloccherebbe di nuovo il
+# doppio clic. Qui i file arrivano da curl, ma la cartella può portarsi dietro il
+# flag da un'installazione manuale precedente: si toglie una volta per tutte.
+xattr -dr com.apple.quarantine "$DIR" 2>/dev/null || true
+
 NOW="$(ver "$DIR/manifest.json")"
 if [ "$NOW" != "$LATEST" ]; then
   echo "ERRORE: dopo l'aggiornamento la version è $NOW invece di $LATEST. Ripristino."

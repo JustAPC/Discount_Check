@@ -17,22 +17,36 @@ Serve una volta sola, cinque minuti.
 
 **1. Scarica il pacchetto**
 
-Vai alla [release più recente](https://github.com/JustAPC/Discount_Check/releases/latest) e scarica
-`discount-check.zip`.
+Su **macOS**, apri Terminale (⌘+Spazio → "Terminale") e incolla:
 
-**2. Scompattalo in una cartella che non sposterai**
+```bash
+mkdir -p ~/Documents/discount-check && curl -sL -o /tmp/dc.zip https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip && unzip -oq /tmp/dc.zip -d ~/Documents/discount-check && open ~/Documents/discount-check
+```
 
-Chrome carica l'estensione **da quella cartella**, non ne fa una copia: se la sposti o la cancelli
-l'estensione smette di funzionare. Una `Documenti/discount-check` va benissimo, la cartella
-Download no.
+Su **Windows**, apri PowerShell e incolla:
 
-**3. Caricala in Chrome**
+```powershell
+$d="$env:USERPROFILE\Documents\discount-check"; mkdir $d -Force | Out-Null; Invoke-WebRequest https://github.com/JustAPC/Discount_Check/releases/latest/download/discount-check.zip -OutFile "$env:TEMP\dc.zip"; Expand-Archive "$env:TEMP\dc.zip" $d -Force; explorer $d
+```
+
+Scarica e scompatta in `Documenti/discount-check`, poi apre la cartella.
+
+> Perché da riga di comando e non dal browser: i file scaricati dal browser vengono marcati come
+> "provenienti da internet", e al primo doppio clic sullo script di aggiornamento macOS dice che
+> _potrebbe contenere malware_ e Windows mostra SmartScreen. Scaricando così il problema non si pone.
+> Se preferisci comunque il download manuale, vedi [Installazione dal browser](#installazione-dal-browser).
+
+**2. Caricala in Chrome**
 
 1. apri `chrome://extensions`
 2. attiva **Modalità sviluppatore** (in alto a destra)
-3. **Carica estensione non pacchettizzata** → seleziona la cartella del punto 2
+3. **Carica estensione non pacchettizzata** → seleziona `Documenti/discount-check`
 
-**4. Inserisci le credenziali del portale**
+Chrome carica l'estensione **da quella cartella**, non ne fa una copia: non spostarla e non
+cancellarla. L'ID dell'estensione dipende dal percorso, quindi spostarla equivale a reinstallarla
+da zero.
+
+**3. Inserisci le credenziali del portale**
 
 Clicca l'icona dell'estensione → **Apri dashboard** → sezione **Accesso al portale** → email e
 password del portale Corporate Benefits → **Salva**.
@@ -41,7 +55,7 @@ Sono le stesse con cui accedi al sito. Restano in `chrome.storage.local`, su que
 sono nel repo né nel pacchetto, e ogni installazione ha le sue. La dashboard non le rilegge mai — il
 campo password ti dice solo se è salvata.
 
-**5. Primo aggiornamento**
+**4. Primo aggiornamento**
 
 Premi **Aggiorna tutto**. Il primo crawl del portale scarica ~900 offerte e dura qualche minuto:
 puoi chiudere la dashboard, va avanti da solo. Revolut e Klarna sono immediati.
@@ -65,10 +79,20 @@ qualcosa va storto ripristina il backup e ti dice cosa è successo.
 L'estensione **non viene mai rimossa**: credenziali, catalogo, alias, segnalazioni e l'icona
 fissata nella barra restano dove sono.
 
-> **La prima volta soltanto** il sistema blocca gli script arrivati da internet. Su macOS
-> ("sviluppatore non identificato"): tasto destro sul file → **Apri** → **Apri**. Su Windows
-> ("Windows ha protetto il PC"): **Ulteriori informazioni** → **Esegui comunque**. Dagli
-> aggiornamenti successivi non succede più, perché i file li scarica lo script e non il browser.
+### Installazione dal browser
+
+Se preferisci scaricare `discount-check.zip` a mano dalla
+[release più recente](https://github.com/JustAPC/Discount_Check/releases/latest), scompattalo in una
+cartella stabile (non Download) e caricalo come sopra. Cambia una cosa sola: al **primo** doppio clic
+sullo script di aggiornamento il sistema lo blocca, perché il browser marca i file come provenienti
+da internet.
+
+- **macOS**, "potrebbe contenere malware" / "sviluppatore non identificato": tasto destro sul file →
+  **Apri** → **Apri**
+- **Windows**, "Windows ha protetto il PC": **Ulteriori informazioni** → **Esegui comunque**
+
+Succede una volta sola: lo script toglie il flag di quarantena dalla cartella, e comunque dagli
+aggiornamenti successivi i file li scarica lui con `curl`, non il browser.
 
 ### A mano, se preferisci
 
