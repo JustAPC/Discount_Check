@@ -727,6 +727,9 @@ async function checkHost(host) {
     rev: byName((st.revolut || {}).offers || [], st.ridx, st.revBlocked || {}),
     kl: byName((st.klarna || {}).offers || [], st.kidx, st.klBlocked || {}),
     snoozed: Date.now() < until,
+    // La dashboard lo mostra per esteso: "in pausa" senza dire fino a quando è uno
+    // stato che l'utente non può né verificare né disfare consapevolmente.
+    snoozeUntil: until,
     stale: catalog.updatedAt ? Date.now() - catalog.updatedAt > 3 * NUDGE_MS : false,
   };
 }
@@ -744,6 +747,20 @@ async function handle(msg) {
   // Il badge lo ha già messo visit(): qui si risponde solo al content script,
   // che a questo punto è già stato iniettato proprio perché c'era qualcosa.
   if (msg.type === "check") return checkHost(msg.host);
+
+  // Cosa c'è sul sito della tab aperta. La dashboard lo chiede per mostrare le stesse
+  // righe della card al checkout: dal badge si legge che c'è qualcosa, non che cosa.
+  // Senza il permesso sui siti tab.url arriva vuoto, e "page: false" copre anche quello.
+  if (msg.type === "current") {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = (tab && tab.url) || "";
+    if (!/^https?:/.test(url)) return { page: false };
+    try {
+      return { page: true, ...(await checkHost(new URL(url).hostname)) };
+    } catch {
+      return { page: false };
+    }
+  }
 
   if (msg.type === "nudge") {
     // catalogo vuoto: avviso max 1 volta al giorno
@@ -769,6 +786,13 @@ async function handle(msg) {
     return { ok: true };
   }
 
+  if (msg.type === "unsnooze") {
+    const { snooze = {} } = await get("snooze");
+    delete snooze[msg.domain];
+    await set({ snooze });
+    return { ok: true };
+  }
+
   if (msg.type === "mute") {
     const { muted = [] } = await get("muted");
     if (!muted.includes(msg.domain)) muted.push(msg.domain);
@@ -783,12 +807,16 @@ async function handle(msg) {
   }
 
   if (msg.type === "report") {
-    // "questa offerta non c'entra con questo sito"
-    const { blocked = {} } = await get("blocked");
-    const list = new Set(blocked[msg.domain] || []);
-    (msg.ids || []).forEach((i) => list.add(i));
-    blocked[msg.domain] = [...list];
-    await set({ blocked });
+    // "questa offerta non c'entra con questo sito". Dalla card arrivano tutte e tre le
+    // fonti insieme; dalla dashboard una riga sola, quindi le liste vuote vanno saltate
+    // o lo storage si riempie di domini con zero segnalazioni.
+    if ((msg.ids || []).length) {
+      const { blocked = {} } = await get("blocked");
+      const list = new Set(blocked[msg.domain] || []);
+      msg.ids.forEach((i) => list.add(i));
+      blocked[msg.domain] = [...list];
+      await set({ blocked });
+    }
 
     if ((msg.revKeys || []).length) {
       // stesso gesto, altra fonte

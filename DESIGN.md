@@ -297,6 +297,18 @@ al posto di un'icona.
 maiuscola 11px, conteggio allineato a destra sempre numerico — **0 si scrive**, perché "nessuno"
 e "non ancora caricato" non possono avere lo stesso aspetto.
 
+### Il blocco del sito corrente
+Prima cosa dentro lo scorrimento del popup: l'host in 12.5px/600 con le azioni di sito a
+destra, poi le stesse righe della card al checkout, nello stesso ordine e con gli stessi
+chip. Niente intestazioni per fonte come nei risultati di ricerca — il colore del chip
+basta, ed e' esattamente cosi' che funziona la card. Il blocco sparisce mentre si cerca,
+come il riepilogo del catalogo: guardare dove si e' e cercare sono due compiti diversi.
+
+Ogni riga porta il divieto ("non c'entra nulla con questo sito"), che prima viveva solo
+dentro la card al checkout: il gesto per correggere un abbinamento sbagliato non deve
+richiedere di arrivare a pagare. Le due icone nuove condividono la sbarra a 45 gradi
+perche' dicono la stessa cosa a due livelli — `bell-off` sul sito, `ban` sulla riga.
+
 ### Empty states
 Ogni lista vuota spiega l'interfaccia invece di annunciare il vuoto: titolo in grassetto 12.5px
 più una frase che dice da dove arrivano quei dati e come farli comparire.

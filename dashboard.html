@@ -419,6 +419,45 @@
         font-weight: 550;
       }
 
+      /* --- il sito su cui sei ------------------------------------------------- */
+      /* Stessa informazione della card al checkout, ma raggiungibile sempre: dal badge
+         si legge che c'e' qualcosa, non che cosa. Niente intestazioni per fonte come
+         nella ricerca - basta il colore del chip, come nella card. */
+      .here-hd {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 2px 0 6px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+      .here-hd .host {
+        font-size: 12.5px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: var(--ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      /* Due azioni quando il sito è in pausa: riprendi e silenzia. Il gruppo prende
+         l'auto, non il singolo bottone, o il secondo verrebbe spinto via dal primo. */
+      .here-hd .acts {
+        display: flex;
+        gap: 2px;
+        margin-left: auto;
+      }
+      .here-none {
+        padding: 9px 0 2px;
+        font-size: 11px;
+        color: var(--ink-3);
+      }
+      #here {
+        margin-bottom: 14px;
+      }
+      #here[hidden] {
+        display: none;
+      }
+
       details {
         border-bottom: 1px solid var(--line-soft);
       }
@@ -668,6 +707,17 @@
         <path d="M6.5 9a5.5 5.5 0 0 1 11 0c0 5.5 2 7 2 7h-15s2-1.5 2-7" />
         <path d="M10.2 19.5a2 2 0 0 0 3.6 0" />
       </symbol>
+      <!-- La campanella sbarrata e il divieto condividono la stessa sbarra a 45°: sono
+       due modi di dire "non qui", uno sul sito e uno sulla singola offerta. -->
+      <symbol id="i-bell-off" viewBox="0 0 24 24">
+        <path d="M6.5 9a5.5 5.5 0 0 1 11 0c0 5.5 2 7 2 7h-15s2-1.5 2-7" />
+        <path d="M10.2 19.5a2 2 0 0 0 3.6 0" />
+        <path d="M4.5 4.5 19.5 19.5" />
+      </symbol>
+      <symbol id="i-ban" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M6.3 6.3 17.7 17.7" />
+      </symbol>
       <symbol id="i-x" viewBox="0 0 24 24">
         <path d="M6 6 18 18" />
         <path d="M18 6 6 18" />
@@ -714,6 +764,10 @@
 
     <main>
       <div id="warn"></div>
+
+      <!-- Cosa c'e' sul sito della tab aperta: le stesse righe della card al checkout,
+       piu' il gesto per disfare un abbinamento sbagliato senza dover arrivare a pagare. -->
+      <section id="here" hidden aria-label="Vantaggi sul sito aperto"></section>
 
       <!-- Annuncia solo il conteggio: leggere l'intera lista a ogni tasto è peggio del silenzio. -->
       <p id="results-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>

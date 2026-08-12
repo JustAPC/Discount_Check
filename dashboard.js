@@ -116,6 +116,9 @@ async function refresh() {
   $('n-muted').textContent = S.muted.length;
   renderCreds();
   $('ver').textContent = 'v' + S.version;
+  // Non atteso: e' un giro di messaggi in piu' e il resto della dashboard non deve
+  // aspettarlo per dipingersi.
+  renderHere();
 
   if ($('d-cb').open) renderCatalog();
   renderRevolut(rev);
@@ -160,6 +163,108 @@ function renderShopAccess() {
   body.appendChild(b);
 }
 
+// --- il sito su cui sei ---------------------------------------------------------
+// Le stesse righe della card al checkout, ma raggiungibili sempre. Dal badge si legge
+// che c'è qualcosa, non che cosa; e "non c'entra nulla" viveva solo dentro la card,
+// cioè nel posto più scomodo da raggiungere apposta. Ordine delle fonti identico alla
+// card, perché è la stessa informazione e non deve sembrare un'altra cosa.
+
+let hereReady = false;
+
+// Cercare è un compito diverso dal guardare dove sei: mentre si cerca il blocco sparisce,
+// come già fa il riepilogo del catalogo, e i risultati restano in cima.
+const hereVisible = () => {
+  $('here').hidden = !hereReady || !!norm($('q').value.trim());
+};
+
+const hereNote = txt => el('div', 'here-none', txt);
+
+// Piu' corte di quelle della card: qui la riga e' su una sola linea con l'ellissi, e
+// "compra la card e pagaci il carrello" si troncava proprio sulla parte che dice
+// cosa fare. Sotto i ~46 caratteri la nota entra intera anche con due bottoni.
+const KIND_NOTE = {
+  giftcard: 'Gift card scontata — pagaci il carrello',
+  shop: 'Convenzione — parti dal portale per il tracking'
+};
+
+function hereRow(o) {
+  const row = el('div', 'item');
+  row.append(el('span', 'pct' + (o.cls ? ' ' + o.cls : ''), o.label));
+  const t = el('div', 't');
+  t.append(el('b', null, o.title), el('div', 'm', o.note));
+  row.append(t, act('ban', 'Non c\'entra nulla con questo sito',
+    async () => { await send(o.hide); refresh(); }));
+  if (o.open) row.append(act('external', 'Apri sul portale', o.open));
+  return row;
+}
+
+async function renderHere() {
+  const r = await send({ type: 'current' });
+  // Senza accesso ai siti l'avviso in cima dice già tutto, e su una pagina del browser
+  // non c'è un sito di cui parlare: in entrambi i casi il blocco non si mostra affatto.
+  hereReady = !!r && r.page && S.shopAccess !== false;
+  hereVisible();
+  if (!hereReady) return;
+
+  const box = $('here');
+  box.innerHTML = '';
+
+  const hd = el('div', 'here-hd');
+  const acts = el('div', 'acts');
+  if (r.snoozed) {
+    acts.append(act('undo', 'Riprendi gli avvisi qui',
+      async () => { await send({ type: 'unsnooze', domain: r.domain }); refresh(); }));
+  }
+  acts.append(r.muted
+    ? act('bell', 'Riattiva gli avvisi qui',
+      async () => { await send({ type: 'unmute', domain: r.domain }); refresh(); })
+    : act('bell-off', 'Mai su questo sito',
+      async () => { await send({ type: 'mute', domain: r.domain }); refresh(); }));
+  hd.append(el('span', 'host', r.domain), acts);
+  box.append(hd);
+
+  if (r.muted) return box.append(hereNote('Silenziato: qui non compare niente. La campanella lo riattiva.'));
+  if (r.empty) return box.append(hereNote('Catalogo non ancora scaricato: non posso sapere se questo sito è convenzionato.'));
+
+  if (!r.offers.length && !r.rev.length && !r.kl.length) {
+    return box.append(hereNote('Nessun vantaggio qui. Se sai che è convenzionato, cercalo qui sotto e usa "Collega a un sito".'));
+  }
+
+  for (const o of r.rev) {
+    box.append(hereRow({
+      cls: 'rev', label: o.label, title: o.name,
+      note: 'Revolut — paga con la carta Revolut' + (o.boosted ? ', tasso potenziato' : ''),
+      hide: { type: 'report', domain: r.domain, revKeys: [o.name_key] }
+    }));
+  }
+  for (const o of r.kl) {
+    box.append(hereRow({
+      cls: 'kl', label: o.label, title: o.name,
+      note: 'Klarna — il cashback si prende dalla Klarna app',
+      hide: { type: 'report', domain: r.domain, klKeys: [o.name_key] }
+    }));
+  }
+  for (const o of r.offers) {
+    const isDisc = DISCOUNT.test(o.d || '');
+    box.append(hereRow({
+      cls: isDisc ? '' : 'none',
+      label: (isDisc && o.d.replace(/\s*sconto/i, '').trim()) || '—',
+      title: o.t,
+      note: (KIND_NOTE[o.k] || 'Convenzione') + (!isDisc && o.d ? ' · ' + o.d : ''),
+      hide: { type: 'report', domain: r.domain, ids: [o.id] },
+      open: () => send({ type: 'open', id: o.id, cat: o.c })
+    }));
+  }
+
+  // Lo snooze è l'unico stato che spegne la card lasciando il badge acceso: senza dirlo,
+  // qui si leggerebbe un elenco di vantaggi e al checkout non comparirebbe niente.
+  if (r.snoozed) {
+    box.append(hereNote('In pausa fino alle ' +
+      new Date(r.snoozeUntil).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
+      ': al checkout non esce nulla.'));
+  }
+}
+
 // Nessuna risposta dal background: schermata onesta con un modo per riprovare.
 function unreachable() {
   live = false;
@@ -169,6 +274,8 @@ function unreachable() {
   $('bar').hidden = true;
   $('browse').hidden = true;
   $('results').hidden = true;
+  hereReady = false;
+  $('here').hidden = true;
   $('warn').innerHTML = '';
   const body = warn('Estensione non raggiungibile',
     'Il service worker non ha risposto. Di solito basta riprovare; se insiste, ricarica l\'estensione da chrome://extensions.',
@@ -202,6 +309,7 @@ function search() {
   const box = $('results');
   $('q-clear').hidden = !q;
   $('browse').hidden = !!q;
+  hereVisible();
   box.hidden = !q;
   box.innerHTML = '';
   if (!q) { $('results-status').textContent = ''; return; }
