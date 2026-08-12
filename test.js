@@ -27,7 +27,7 @@ const ctx = {
   }
 };
 vm.createContext(ctx);
-vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild, collapsed };', ctx);
+vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild, collapsed, wordKeys };', ctx);
 const T = ctx.__T;
 
 let fail = 0;
@@ -106,9 +106,12 @@ const titoli = {
   23: 'Primark Gift Cards', 24: 'Uber Gift Cards', 25: 'KitchenAid', 26: 'Notorious Cinemas',
   27: 'Alpitour World', 28: 'Jurassic World', 29: 'Cicli Drigani', 30: 'Allianz Direct - Casa'
 };
-const name = {};
-for (const [id, t] of Object.entries(titoli)) for (const k of T.nameKeys(t)) (name[k] ||= []).push(id);
-const idx = { dom: { 'kitchenaid.it': ['25'] }, name };
+const name = {}, word = {};
+for (const [id, t] of Object.entries(titoli)) {
+  for (const k of T.nameKeys(t)) (name[k] ||= []).push(id);
+  for (const k of T.wordKeys(t)) (word[k] ||= []).push(id);
+}
+const idx = { dom: { 'kitchenaid.it': ['25'] }, name, word };
 const m = h => T.matchIds(h, idx).map(i => titoli[i]);
 
 const positivi = {
@@ -137,19 +140,30 @@ eq('match: nessun falso positivo', negativi.filter(h => m(h).length), []);
 // questi falsi positivi non sono piu' invisibili fino al checkout.
 eq('nameKeys: token corto non fa chiave', [...T.nameKeys('Brave Soul')], ['bravesoul']);
 eq('nameKeys: nome di persona non fa chiave', [...T.nameKeys('Andrea Milano')], ['andreamilano']);
-// Ma un token lungo resta prezioso: e' come si aggancia mondadoristore.it.
-eq('nameKeys: token lungo resta',
-  [...T.nameKeys('Gruppo Editoriale Mondadori')].includes('mondadori'), true);
+// Ma un token lungo resta prezioso, in un indice a parte: e' come si aggancia
+// mondadoristore.it a "Gruppo Editoriale Mondadori".
+eq('wordKeys: token lungo resta',
+  [...T.wordKeys('Gruppo Editoriale Mondadori')].includes('mondadori'), true);
+eq('wordKeys: nome di una parola non ne produce', [...T.wordKeys('Expedia')], []);
 // Brand di una parola sola: la chiave del nome intero e' gia' il token.
 eq('nameKeys: brand corto di una parola', [...T.nameKeys('LEGO® Gift Cards')], ['lego']);
 
-const collisioni = { 'bravesoul': ['31'], 'andreamilano': ['32'], 'mondadori': ['33'] };
-const cIdx = { dom: {}, name: collisioni };
+const cIdx = {
+  dom: {},
+  name: { 'bravesoul': ['31'], 'andreamilano': ['32'], 'qatarairways': ['34'], 'itaairways': ['35'] },
+  word: { 'mondadori': ['33'], 'airways': ['34', '35'] }
+};
 eq('match: brave.com non e\' Brave Soul', T.matchIds('search.brave.com', cIdx), []);
 eq('match: andreapontillo.tech non e\' Andrea Milano',
   T.matchIds('ha.andreapontillo.tech', cIdx), []);
 eq('match: mondadoristore.it resta agganciato',
   T.matchIds('www.mondadoristore.it', cIdx), ['33']);
+
+// Il settore non e' il marchio: "airways" e' lungo abbastanza da passare la soglia, ma
+// "itaairways" lo contiene solo perche' finisce con la stessa parola. La regola del
+// prefisso separa il marchio davanti dal settore dietro - e vale nei due versi.
+eq('match: ita-airways non e\' Qatar Airways', T.matchIds('www.ita-airways.com', cIdx), ['35']);
+eq('match: qatarairways non e\' ITA Airways', T.matchIds('www.qatarairways.com', cIdx), ['34']);
 
 // --- collapsed: il portale è cambiato o il calo è vero? --------------------
 eq('collapsed: crollo da portale rotto', T.collapsed(12, 890, 0), true);

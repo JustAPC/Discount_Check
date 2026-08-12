@@ -402,18 +402,31 @@ const norm = (s) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
-function nameKeys(title) {
-  const toks = norm(title)
+const words = (title) =>
+  norm(title)
     .split(" ")
     .filter((w) => w && !NOISE.has(w));
+
+// Il nome intero, appiccicato. È la chiave forte: matchIds la accetta anche come
+// sottostringa del dominio, nei due versi.
+function nameKeys(title) {
+  const t = words(title);
+  return t.length ? new Set([t.join("")]) : new Set();
+}
+
+// Le singole parole di un nome composto, quando sono lunghe abbastanza da poter essere
+// un marchio. È un indizio debole e sta in un indice a parte, dove matchIds pretende che
+// il dominio ci cominci: serve ad agganciare "Gruppo Editoriale Mondadori" a
+// mondadoristore.it, non a far credere che "Qatar Airways" c'entri con ita-airways.com.
+//
+// La soglia di lunghezza da sola non basta: "airways" ha sette caratteri e passerebbe.
+// Un nome di una parola sola non produce niente qui, perché la chiave forte è già quella
+// parola e ripeterla nell'indice debole servirebbe solo ad allentare la regola.
+function wordKeys(title) {
+  const t = words(title);
   const keys = new Set();
-  if (toks.length) keys.add(toks.join(""));
-  // Un singolo token vale come chiave solo se è lungo abbastanza da essere un nome e non
-  // una parola. Sotto questa soglia produceva collisioni con domini che non c'entrano:
-  // "Brave Soul" dava la chiave "brave" e marcava brave.com, "Andrea Milano" dava
-  // "andrea" e marcava andreapontillo.tech. I brand di una parola sola sono già coperti
-  // dalla chiave del nome intero, che per loro è la stessa cosa.
-  for (const w of toks) if (w.length >= MIN_TOKEN && !GENERIC.has(w)) keys.add(w);
+  if (t.length < 2) return keys;
+  for (const w of t) if (w.length >= MIN_TOKEN && !GENERIC.has(w)) keys.add(w);
   return keys;
 }
 
@@ -443,10 +456,12 @@ function etld1(hostname) {
 async function rebuild(catalog) {
   const { aliases = {} } = await get("aliases");
   const dom = {},
-    name = {};
+    name = {},
+    word = {};
   for (const [id, o] of Object.entries(catalog.offers)) {
     if (o.k === "shop" && o.h) (dom[etld1(o.h)] ||= []).push(id);
     for (const k of nameKeys(o.t)) (name[k] ||= []).push(id);
+    for (const k of wordKeys(o.t)) (word[k] ||= []).push(id);
   }
   // Gli alias sono l'unica parte dell'indice che non deriva dal catalogo: senza
   // riapplicarli qui, ogni collegamento fatto a mano dalla dashboard sopravviveva
@@ -455,7 +470,7 @@ async function rebuild(catalog) {
   for (const [d, ids] of Object.entries(aliases)) {
     for (const id of ids) if (catalog.offers[id]) (dom[d] ||= []).push(id);
   }
-  await set({ idx: { dom, name } });
+  await set({ idx: { dom, name, word } });
 }
 
 // --- Revolut ---------------------------------------------------------------
@@ -487,15 +502,17 @@ async function syncRevolut() {
 async function rebuildRev() {
   const { revolut = { offers: [] }, revAliases = {} } = await get(["revolut", "revAliases"]);
   const dom = {},
-    name = {};
+    name = {},
+    word = {};
   for (const o of revolut.offers) {
     if (o.domain) (dom[etld1(o.domain)] ||= []).push(o.name_key);
     for (const k of nameKeys(o.name)) (name[k] ||= []).push(o.name_key);
+    for (const k of wordKeys(o.name)) (word[k] ||= []).push(o.name_key);
   }
   for (const [d, keys] of Object.entries(revAliases)) {
     for (const k of keys) (dom[d] ||= []).push(k);
   }
-  await set({ ridx: { dom, name } });
+  await set({ ridx: { dom, name, word } });
 }
 
 // --- Klarna ----------------------------------------------------------------
@@ -574,15 +591,17 @@ async function syncKlarna() {
 async function rebuildKl() {
   const { klarna = { offers: [] }, klAliases = {} } = await get(["klarna", "klAliases"]);
   const dom = {},
-    name = {};
+    name = {},
+    word = {};
   for (const o of klarna.offers) {
     if (o.domain) (dom[etld1(o.domain)] ||= []).push(o.name_key);
     for (const k of nameKeys(o.name)) (name[k] ||= []).push(o.name_key);
+    for (const k of wordKeys(o.name)) (word[k] ||= []).push(o.name_key);
   }
   for (const [d, keys] of Object.entries(klAliases)) {
     for (const k of keys) (dom[d] ||= []).push(k);
   }
-  await set({ kidx: { dom, name } });
+  await set({ kidx: { dom, name, word } });
 }
 
 // --- matching --------------------------------------------------------------
@@ -599,6 +618,12 @@ function matchIds(hostname, idx) {
       k === clean ||
       (k.length >= 6 && (label.includes(k) || (label.length >= 6 && k.includes(label))));
     if (hit) for (const id of list) ids.add(id);
+  }
+  // Indice debole: una parola sola presa da un nome composto si crede solo se il dominio
+  // ci comincia. I marchi mettono il nome davanti e il settore dietro — ita-airways,
+  // mondadoristore — quindi il prefisso separa chi è il negozio da che cosa vende.
+  for (const [k, list] of Object.entries(idx.word || {})) {
+    if (label.startsWith(k) || clean.startsWith(k)) for (const id of list) ids.add(id);
   }
   return [...ids];
 }
