@@ -26,7 +26,7 @@ alla dashboard — il campo password mostra solo se è salvata.
 ## Seconda fonte: Revolut
 
 Il popup mostra anche i **moltiplicatori RevPoints** dei negozi Revolut, che si sommano alla
-convenzione CB: si può usare il portale *e* pagare con Revolut.
+convenzione CB: si può usare il portale _e_ pagare con Revolut.
 
 Il catalogo Revolut non si può crawlare — sta dentro l'app. Arriva quindi da `sconti-api`,
 un servizio self-hosted (vedi [server/](server/)) che l'estensione interroga una volta al
@@ -59,6 +59,7 @@ Come per Revolut, una risposta vuota o un errore non svuotano la cache: l'ultima
 resta valida.
 
 ### Matching a 3 livelli
+
 1. **Alias manuale** (dashboard → "collega a un sito") — vince sempre
 2. **Dominio** estratto dal link uscente dell'offerta
 3. **Nome brand** normalizzato vs dominio corrente — l'unico che copre gift card e portali dedicati
@@ -66,6 +67,7 @@ resta valida.
 Tarato per **preferire i falsi positivi**. Quando sbaglia: "Non c'entra nulla" nel popup, oppure la sezione **Segnalazioni di errore** in dashboard (reversibile).
 
 ### Login fallito
+
 Se il re-login automatico non riesce (credenziali mai inserite, o password cambiata) la dashboard lo
 dice esplicitamente, con una scorciatoia al campo, e il popup al checkout esce **comunque**, con
 l'avviso "Sessione scaduta". Il catalogo salvato resta valido per il match. Se il catalogo non è mai stato scaricato, al checkout appare un avviso generico max 1 volta al giorno.
@@ -81,7 +83,7 @@ in silenzio e nessuno viene avvisato: bumpare `manifest.json` è il gesto che di
 pena scaricarla".
 
 L'estensione controlla una volta al giorno la `version` nel manifest servito da GitHub Pages
-(`justapc.github.io/cb-reminder/manifest.json`) — non l'API di GitHub, che ha 60 richieste/ora per
+(`justapc.github.io/Discount_Check/manifest.json`) — non l'API di GitHub, che ha 60 richieste/ora per
 IP e risponde 403 quando le esaurisci con altro. Se è più recente di quella installata: riga cliccabile in cima alla dashboard e **`!` rosso sul badge** dell'icona. Il badge
 del conteggio offerte ha però la precedenza sui siti convenzionati — lì il `!` non compare, perché
 sapere che c'è uno sconto vale più che sapere che c'è un aggiornamento.
@@ -91,14 +93,14 @@ Aggiornare resta manuale: scarica lo zip, scompatta sopra la cartella, `chrome:/
 
 ## Struttura
 
-| File | Ruolo |
-|---|---|
-| `background.js` | crawl del portale, parsing, indici, matching, badge |
-| `content.js` | rilevamento checkout + overlay (Shadow DOM) |
-| `dashboard.html/js` | stato sync, ricerca catalogo, alias, segnalazioni, mute |
-| `test.js` | test delle funzioni di parsing e matching (`node test.js`) |
-| `server/` | `sconti-api`: il servizio che tiene il catalogo Revolut (Docker su TrueNAS) |
-| `hermes-skill/` | skill Hermes che legge gli screenshot Revolut e riempie il catalogo |
+| File                | Ruolo                                                                       |
+| ------------------- | --------------------------------------------------------------------------- |
+| `background.js`     | crawl del portale, parsing, indici, matching, badge                         |
+| `content.js`        | rilevamento checkout + overlay (Shadow DOM)                                 |
+| `dashboard.html/js` | stato sync, ricerca catalogo, alias, segnalazioni, mute                     |
+| `test.js`           | test delle funzioni di parsing e matching (`node test.js`)                  |
+| `server/`           | `sconti-api`: il servizio che tiene il catalogo Revolut (Docker su TrueNAS) |
+| `hermes-skill/`     | skill Hermes che legge gli screenshot Revolut e riempie il catalogo         |
 
 ## Note tecniche (le cose che non sono ovvie)
 
