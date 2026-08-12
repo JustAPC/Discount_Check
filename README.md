@@ -22,6 +22,9 @@ alla dashboard — il campo password mostra solo se è salvata.
   dashboard; "Aggiorna Revolut" e "Aggiorna Klarna" da soli evitano il crawl lungo del portale
   quando serve solo l'altro catalogo
 - **Login automatico**: quando la sessione del portale scade, il service worker rifà il login da solo con le credenziali salvate e riprende il crawl. Nessun intervento manuale, la sync giornaliera è autonoma. Tutto resta in `chrome.storage.local`
+- **Gate riservatezza**: al primo accesso di ogni sessione il portale mostra il popup "Riservatezza
+  sulle convenzioni!" e finché non lo confermi serve la home al posto di ogni scheda offerta — il
+  crawl finirebbe con catalogo vuoto. Il service worker lo riconosce e lo conferma da solo
 
 ## Seconda fonte: Revolut
 

@@ -90,6 +90,7 @@ async function resume() {
 
 class LoginError extends Error {
   // reason: 'nocreds' (non ancora inserite in dashboard) | 'failed' (rifiutate dal portale)
+  //       | 'disclaimer' (il gate riservatezza non si è lasciato confermare)
   constructor(reason) {
     super(reason);
     this.reason = reason;
@@ -122,7 +123,24 @@ async function doLogin() {
   return (await r.text()).includes("/logout") ? "ok" : "failed";
 }
 
-// Durante il crawl ci sono CONC fetch in volo: un solo login condiviso, non quattro.
+// Al primo accesso di ogni sessione il portale mostra il gate "Riservatezza sulle
+// convenzioni!": risponde 200 e con /logout dentro, ma serve la home al posto di ogni
+// scheda, quindi senza confermarlo il crawl finisce con catalogo 0. Il form non ha
+// CSRF token: una POST sulla home con disclaimerAccept=1 basta.
+const DISCLAIMER = "cbg-user-disclaimer--form";
+
+async function doAccept() {
+  const r = await fetch(PORTAL + "/", {
+    method: "POST",
+    credentials: "include",
+    redirect: "follow",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ disclaimerAccept: "1", "cbg3-submit": "Conferma" }),
+  });
+  return !(await r.text()).includes(DISCLAIMER);
+}
+
+// Stesso motivo del login: con CONC fetch in volo una conferma sola, non quattro.
 let loginP = null;
 function login() {
   if (!loginP)
@@ -132,6 +150,15 @@ function login() {
   return loginP;
 }
 
+let acceptP = null;
+function accept() {
+  if (!acceptP)
+    acceptP = doAccept().finally(() => {
+      acceptP = null;
+    });
+  return acceptP;
+}
+
 async function fetchText(path, retry = true) {
   const r = await fetch(PORTAL + path, { credentials: "include", redirect: "follow" });
   const t = await r.text();
@@ -139,6 +166,10 @@ async function fetchText(path, retry = true) {
   if (!t.includes("/logout")) {
     const res = retry ? await login() : "failed";
     if (res !== "ok") throw new LoginError(res);
+    return fetchText(path, false);
+  }
+  if (t.includes(DISCLAIMER)) {
+    if (!retry || !(await accept())) throw new LoginError("disclaimer");
     return fetchText(path, false);
   }
   return t;

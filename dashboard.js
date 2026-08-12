@@ -57,9 +57,13 @@ async function refresh() {
   $('warn').innerHTML = '';
   if (st.state === 'login') {
     const body = warn(
-      st.reason === 'nocreds' ? 'Credenziali mancanti' : 'Login al portale fallito',
+      st.reason === 'nocreds' ? 'Credenziali mancanti'
+        : st.reason === 'disclaimer' ? 'Conferma richiesta dal portale'
+        : 'Login al portale fallito',
       st.reason === 'nocreds'
         ? 'Senza email e password non posso rifare il login quando la sessione scade.'
+        : st.reason === 'disclaimer'
+        ? 'Apri il portale, premi Conferma sul popup "Riservatezza sulle convenzioni!" e rilancia Aggiorna tutto.'
         : 'Il portale ha rifiutato le credenziali salvate. Il catalogo resta attivo, ma può essere incompleto.');
     const b = el('button', 'btn', 'Inserisci le credenziali');
     b.onclick = () => {
