@@ -1,4 +1,4 @@
-# CB Reminder
+# Discount Check
 
 Estensione Chrome/Edge (MV3) che ricorda gli sconti Corporate Benefits mentre fai acquisti online.
 Portale: `almaviva.convenzioniaziendali.it`.
