@@ -188,6 +188,11 @@ async function sync() {
   const { sync: st } = await get("sync");
   if (st && st.state === "running") return;
 
+  // Senza credenziali il crawl può solo fallire: il portale servirebbe la pagina di
+  // login a ogni richiesta. Meglio non partire e dirlo, che far girare ogni giorno una
+  // sync destinata all'errore. Riparte da sola appena le credenziali vengono salvate.
+  if (!(await creds())) return fail(new LoginError("nocreds"));
+
   running = true;
   await set({ sync: { state: "running", phase: "categorie", total: 0, done: 0 } });
   try {
@@ -801,6 +806,8 @@ async function handle(msg, sender) {
     const password = msg.password || cur.password || "";
     if (!email || !password) return { error: "Servono email e password" };
     await set({ creds: { email, password } });
+    // Il crawl era fermo proprio perché mancavano queste: appena ci sono, riparte.
+    sync();
     return { ok: true };
   }
 
