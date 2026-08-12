@@ -1,6 +1,6 @@
 ---
 name: Discount Check
-description: Sistema visivo dell'estensione che ricorda sconti Corporate Benefits e punti Revolut prima di pagare.
+description: Sistema visivo dell'estensione che ricorda sconti Corporate Benefits, punti Revolut e cashback Klarna prima di pagare.
 colors:
   ground: "#fbfbfc"
   surface: "#ffffff"
@@ -128,9 +128,9 @@ annidate e senza griglie di riquadri statistici. La densità è alta perché lo 
 
 Il colore non decora niente. Ogni tinta ha esattamente un significato e ricorre identica su
 tutte e due le superfici dell'estensione: il popup della toolbar e la card iniettata nella
-pagina di checkout. Verde vuol dire Corporate Benefits, viola vuol dire Revolut, e la
-distinzione conta perché le due fonti si usano in modo diverso — una chiede di passare dal
-portale, l'altra di pagare con una certa carta.
+pagina di checkout. Verde vuol dire Corporate Benefits, viola vuol dire Revolut, rosa vuol
+dire Klarna, e la distinzione conta perché le tre fonti si usano in modo diverso — una chiede
+di passare dal portale, una di pagare con una certa carta, una di comprare dentro un'app.
 
 L'anti-riferimento dichiarato è il popup di estensione che apre con quattro tessere-statistica
 e un gradiente: qui le cifre stanno su una riga sola da 11px e la prima cosa a fuoco è il
@@ -139,13 +139,13 @@ campo di ricerca.
 **Key Characteristics:**
 - Riga + filetto come unica struttura di lista; nessuna card dentro una card.
 - Tre soli gradi tipografici, font di sistema, cifre tabulari ovunque compaiano numeri.
-- Colore esclusivamente semantico, cinque significati, zero accenti decorativi.
+- Colore esclusivamente semantico, sei significati, zero accenti decorativi.
 - Un solo contenitore scorrevole per superficie.
 - Stato del catalogo sempre visibile, mai mascherato.
 
 ## Colors
 
-Fondo neutro freddo, inchiostro quasi nero, e cinque colori che parlano: due per le fonti dati,
+Fondo neutro freddo, inchiostro quasi nero, e sei colori che parlano: tre per le fonti dati,
 tre per lo stato del sistema.
 
 ### Primary
@@ -155,6 +155,9 @@ tre per lo stato del sistema.
 ### Secondary
 - **Viola RevPoints** (`#6b28d9`, su `#f0eafd`): Revolut, e nient'altro. Chip moltiplicatore,
   pallino del gruppo, cifra dei negozi Revolut. In scuro `#c4b5fd` su `#2e1065`.
+- **Rosa Klarna** (`#b0114c`, su `#fde8ef`, 5.9:1): Klarna, e nient'altro. Chip cashback,
+  pallino del gruppo, cifra dei negozi Klarna. In scuro `#f9a8c8` su `#450a25`. È il rosa di
+  Klarna portato a un valore leggibile: il `#FFB3C7` del brand non regge il testo.
 
 ### Tertiary
 - **Blu sync** (`#1d4ed8`): sincronizzazione in corso — pallino pulsante e barra di avanzamento.
@@ -174,9 +177,9 @@ tre per lo stato del sistema.
   valore minimo, non un grigio libero.
 
 ### Named Rules
-**La regola un colore, un significato.** Cinque tinte, cinque significati, nessuna eccezione:
-verde = Corporate Benefits, viola = Revolut, blu = sync in corso, ambra = login scaduto,
-rosso = guasto. Una tinta usata "perché sta bene" è un bug. Un colore non porta mai
+**La regola un colore, un significato.** Sei tinte, sei significati, nessuna eccezione:
+verde = Corporate Benefits, viola = Revolut, rosa = Klarna, blu = sync in corso,
+ambra = login scaduto, rosso = guasto. Una tinta usata "perché sta bene" è un bug. Un colore non porta mai
 un'informazione da solo: accanto c'è sempre un'etichetta o un'icona.
 
 **La regola del chip onesto.** Il chip colorato contiene solo un valore che si legge come

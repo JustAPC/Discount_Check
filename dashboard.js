@@ -56,10 +56,18 @@ async function refresh() {
 
   $('warn').innerHTML = '';
   if (st.state === 'login') {
-    warn(st.reason === 'nocreds' ? 'Credenziali mancanti' : 'Login al portale fallito',
+    const body = warn(
+      st.reason === 'nocreds' ? 'Credenziali mancanti' : 'Login al portale fallito',
       st.reason === 'nocreds'
-        ? 'Crea credentials.json nella cartella dell\'estensione (vedi credentials.example.json) e ricarica l\'estensione.'
-        : 'Il portale ha rifiutato email o password in credentials.json. Il catalogo salvato resta attivo, ma può essere incompleto.');
+        ? 'Senza email e password non posso rifare il login quando la sessione scade.'
+        : 'Il portale ha rifiutato le credenziali salvate. Il catalogo resta attivo, ma può essere incompleto.');
+    const b = el('button', 'btn', 'Inserisci le credenziali');
+    b.onclick = () => {
+      $('d-creds').open = true;
+      $('d-creds').scrollIntoView({ block: 'nearest' });
+      $('cred-email').focus();
+    };
+    body.appendChild(b);
   } else if (st.state === 'error') {
     warn('Sincronizzazione fallita', st.error || 'errore sconosciuto', 'err');
   }
@@ -74,17 +82,23 @@ async function refresh() {
   $('sync-label').textContent = running ? 'In corso…' : 'Aggiorna tutto';
 
   const rev = (S.revolut || {}).offers || [];
+  const kl = (S.klarna || {}).offers || [];
   $('s-count').textContent = S.count;
   $('s-rev').textContent = rev.length;
+  $('s-kl').textContent = kl.length;
 
   const blocked = Object.entries(S.blocked).flatMap(([d, ids]) => ids.map(id => [d, id]));
   $('n-cb').textContent = S.count;
   $('n-rev').textContent = rev.length;
+  $('n-kl').textContent = kl.length;
   $('n-blocked').textContent = blocked.length;
   $('n-muted').textContent = S.muted.length;
+  renderCreds();
+  renderUpdate();
 
   if ($('d-cb').open) renderCatalog();
   renderRevolut(rev);
+  renderKlarna(kl);
   renderBlocked(blocked);
   renderMuted();
   search();
@@ -153,17 +167,20 @@ function search() {
     .filter(([, o]) => norm(o.t).includes(q) || norm(o.h).includes(q))
     .sort(([, a], [, b]) => rank(a.t, b.t, q));
 
-  const rev = ((S.revolut || {}).offers || [])
+  const byName = list => list
     .filter(o => norm(o.name).includes(q) || norm(o.domain).includes(q))
     .sort((a, b) => rank(a.name, b.name, q));
+  const rev = byName((S.revolut || {}).offers || []);
+  const kl = byName((S.klarna || {}).offers || []);
 
   $('results-status').textContent =
-    `${cb.length} Corporate Benefits · ${rev.length} Revolut`;
+    `${cb.length} Corporate Benefits · ${rev.length} Revolut · ${kl.length} Klarna`;
 
-  if (!cb.length && !rev.length) {
+  if (!cb.length && !rev.length && !kl.length) {
     const e = el('div', 'empty');
     e.append(el('b', null, `Nessun risultato per "${$('q').value.trim()}"`),
-      `Cerco tra ${S.count} offerte Corporate Benefits e ${((S.revolut || {}).offers || []).length} negozi Revolut. ` +
+      `Cerco tra ${S.count} offerte Corporate Benefits, ${((S.revolut || {}).offers || []).length} negozi Revolut ` +
+      `e ${((S.klarna || {}).offers || []).length} negozi Klarna. ` +
       'Se il negozio esiste ma non lo trovo, il catalogo potrebbe essere da aggiornare.');
     box.appendChild(e);
     return;
@@ -175,14 +192,19 @@ function search() {
     if (cb.length > MAX_HITS) box.appendChild(more(cb.length - MAX_HITS));
   }
   if (rev.length) {
-    box.appendChild(group('Revolut', rev.length, true));
-    for (const o of rev.slice(0, MAX_HITS)) box.appendChild(revRow(o, q));
+    box.appendChild(group('Revolut', rev.length, 'rev'));
+    for (const o of rev.slice(0, MAX_HITS)) box.appendChild(storeRow(o, 'rev', q));
     if (rev.length > MAX_HITS) box.appendChild(more(rev.length - MAX_HITS));
+  }
+  if (kl.length) {
+    box.appendChild(group('Klarna', kl.length, 'kl'));
+    for (const o of kl.slice(0, MAX_HITS)) box.appendChild(storeRow(o, 'kl', q));
+    if (kl.length > MAX_HITS) box.appendChild(more(kl.length - MAX_HITS));
   }
 }
 
-function group(name, n, isRev) {
-  const g = el('div', 'grp' + (isRev ? ' rev' : ''), name);
+function group(name, n, src) {
+  const g = el('div', 'grp' + (src ? ' ' + src : ''), name);
   g.appendChild(el('span', 'n', String(n)));
   return g;
 }
@@ -217,19 +239,23 @@ function cbRow(id, o, q) {
   return row;
 }
 
-function revRow(o, q) {
+// Revolut e Klarna hanno la stessa forma (name, name_key, label, domain): una riga sola,
+// cambia il colore del chip e il dettaglio in fondo.
+function storeRow(o, src, q) {
   const row = el('div', 'item');
-  row.append(el('span', 'pct rev', o.label));
+  row.append(el('span', 'pct ' + src, o.label));
 
   const t = el('div', 't');
   const title = el('b');
   title.appendChild(mark(o.name, q));
   const meta = el('div', 'm');
   meta.appendChild(mark(o.domain || o.badge_raw || '', o.domain ? q : ''));
-  if (o.boosted) meta.append(' · potenziato');
+  if (src === 'rev' && o.boosted) meta.append(' · potenziato');
+  if (src === 'kl') meta.append(' · solo dalla Klarna app');
   t.append(title, meta);
 
-  row.append(t, act('link', 'Collega a un sito', () => askDomain(row, { key: o.name_key })));
+  row.append(t, act('link', 'Collega a un sito',
+    () => askDomain(row, { key: o.name_key, src })));
   return row;
 }
 
@@ -247,7 +273,7 @@ function askDomain(afterRow, target) {
       .replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
     if (!d) { inp.focus(); return; }
     await send(target.key
-      ? { type: 'revAlias', domain: d, key: target.key }
+      ? { type: target.src === 'kl' ? 'klAlias' : 'revAlias', domain: d, key: target.key }
       : { type: 'alias', domain: d, id: target.id });
     w.remove();
     refresh();
@@ -295,7 +321,29 @@ function renderRevolut(list) {
     box.appendChild(e);
     return;
   }
-  for (const o of list) box.appendChild(revRow(o, ''));
+  for (const o of list) box.appendChild(storeRow(o, 'rev', ''));
+}
+
+function renderKlarna(list) {
+  const ks = S.klSync || {};
+  $('kl-sub').textContent = ks.state === 'error'
+    ? `ultimo tentativo fallito: ${ks.error}`
+    : `aggiornato ${fmt((S.klarna || {}).at)}`;
+
+  const box = $('kl-list');
+  box.innerHTML = '';
+  if (!list.length) {
+    const e = el('div', 'empty');
+    e.append(el('b', null, 'Nessun negozio Klarna in cache'),
+      'Premi "Aggiorna Klarna": la lista arriva da klarna.com/it/store e tiene solo i negozi ' +
+      'che danno cashback. Il cashback si prende comprando dalla Klarna app, non da qui.');
+    box.appendChild(e);
+    return;
+  }
+  // Ordine per tasso: il senso della sezione è "dove mi conviene passare dall'app".
+  for (const o of [...list].sort((a, b) => b.rate - a.rate || a.name.localeCompare(b.name))) {
+    box.appendChild(storeRow(o, 'kl', ''));
+  }
 }
 
 function renderBlocked(pairs) {
@@ -338,6 +386,30 @@ function renderMuted() {
   }
 }
 
+// --- nuova versione -------------------------------------------------------------
+// L'estensione è distribuita a mano: qui si può solo dire che c'è, il download e il
+// ricaricamento restano all'utente.
+
+function renderUpdate() {
+  const u = S.update;
+  $('upd').hidden = !u;
+  if (!u) return;
+  $('upd').href = u.url;
+  $('upd-txt').textContent = `Versione ${u.version} disponibile — hai la ${S.version}`;
+}
+
+// --- credenziali del portale ---------------------------------------------------
+// La password non torna mai indietro dal background: il campo resta vuoto e vuoto
+// significa "non toccarla". Si riscrive solo per cambiarla.
+
+function renderCreds() {
+  const c = S.creds || { email: '', saved: false };
+  $('n-creds').textContent = c.saved ? 'salvate' : 'da inserire';
+  if (document.activeElement !== $('cred-email')) $('cred-email').value = c.email;
+  $('cred-pass').placeholder = c.saved ? '•••••••• (salvata)' : 'password';
+  $('cred-clear').disabled = !c.saved && !c.email;
+}
+
 // --- eventi -------------------------------------------------------------------
 
 $('sync').onclick = async () => { await send({ type: 'syncAll' }); setTimeout(refresh, 300); };
@@ -353,7 +425,41 @@ $('rev-sync').onclick = async () => {
   refresh();
 };
 
+$('kl-sync').onclick = async () => {
+  const b = $('kl-sync');
+  b.disabled = true;
+  b.classList.add('busy');
+  await send({ type: 'klSync' });
+  b.disabled = false;
+  b.classList.remove('busy');
+  refresh();
+};
+
 $('d-cb').addEventListener('toggle', () => { if ($('d-cb').open && live) renderCatalog(); });
+
+$('cred-save').onclick = async () => {
+  const r = await send({
+    type: 'setCreds',
+    email: $('cred-email').value,
+    password: $('cred-pass').value
+  });
+  $('cred-msg').textContent = !r ? 'estensione non raggiungibile' : r.error || 'salvate';
+  if (r && r.ok) $('cred-pass').value = '';
+  refresh();
+};
+
+$('cred-clear').onclick = async () => {
+  await send({ type: 'clearCreds' });
+  $('cred-email').value = '';
+  $('cred-pass').value = '';
+  $('cred-msg').textContent = 'cancellate';
+  refresh();
+};
+
+// Invio in uno dei due campi = Salva: è un form di due righe, non serve altro.
+for (const id of ['cred-email', 'cred-pass']) {
+  $(id).onkeydown = e => { if (e.key === 'Enter') $('cred-save').click(); };
+}
 
 $('q').oninput = search;
 $('q-clear').onclick = () => { $('q').value = ''; $('q').focus(); search(); };

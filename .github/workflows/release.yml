@@ -1,0 +1,41 @@
+name: release
+
+# Ogni push su main rigenera lo zip. Il tag è la version del manifest: se non la
+# bumpi, la release esistente viene solo riscritta con il codice nuovo e nessuno
+# riceve l'avviso di aggiornamento. Bumpare manifest.json è il gesto che dice
+# "questa vale la pena scaricarla".
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: v
+        run: echo "v=$(jq -r .version manifest.json)" >> "$GITHUB_OUTPUT"
+
+      # Nello zip va solo ciò che Chrome carica: niente server, skill, test, docs.
+      - run: |
+          mkdir -p dist
+          zip -r dist/discount-check.zip . \
+            -x '.git/*' '.github/*' 'dist/*' 'server/*' 'hermes-skill/*' \
+               '.impeccable/*' '*.md' 'test.js' '.gitignore' '.prettierrc*'
+
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.v.outputs.v }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/discount-check.zip --clobber
+          else
+            gh release create "$tag" dist/discount-check.zip \
+              --title "$tag" \
+              --notes 'Scarica `discount-check.zip`, scompattalo, e da `chrome://extensions` premi **Aggiorna** sulla scheda dell'"'"'estensione (o ricaricala con "Carica estensione non pacchettizzata" se è la prima volta).'
+          fi

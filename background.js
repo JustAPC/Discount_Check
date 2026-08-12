@@ -2,6 +2,13 @@
 const PORTAL = 'https://almaviva.convenzioniaziendali.it';
 // Catalogo Revolut, servito da sconti-api. Sola lettura e nessun segreto: sta qui.
 const REVOLUT_API = 'https://sconti-api.andreapontillo.tech';
+// Catalogo Klarna: è la stessa API JSON che alimenta klarna.com/it/store, pubblica e
+// senza chiave. Niente crawl e niente server di mezzo: la chiama il service worker.
+const KLARNA_API = 'https://www.klarna.com/it/api/store-edge-rest/public/stores/directory/search/IT';
+const KLARNA_PAGE = 100;   // oltre 100 per pagina l'API risponde con zero negozi
+// L'estensione si distribuisce a mano: qui si guarda se c'è una release più nuova.
+const RELEASES_API = 'https://api.github.com/repos/JustAPC/cb-reminder/releases/latest';
+const BADGE_UPDATE = '#dc2626';
 const CONC = 4;            // fetch in parallelo durante il crawl
 const PARSE_V = 2;         // versione di parseOffer: bumpala e la sync ri-scarica tutto
 const SAVE_EVERY = 10;     // batch tra un salvataggio e l'altro
@@ -20,17 +27,50 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create('daily', { periodInMinutes: 1440, delayInMinutes: 1 });
   chrome.alarms.create('resume', { periodInMinutes: 1 });
   sync();
+  checkUpdate();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   chrome.alarms.create('daily', { periodInMinutes: 1440 });
   chrome.alarms.create('resume', { periodInMinutes: 1 });
+  checkUpdate();
 });
 
 chrome.alarms.onAlarm.addListener(a => {
-  if (a.name === 'daily') { sync(); syncRevolut(); }
+  if (a.name === 'daily') { sync(); syncRevolut(); syncKlarna(); checkUpdate(); }
   if (a.name === 'resume') resume();
 });
+
+// --- aggiornamenti dell'estensione -----------------------------------------
+// Distribuita a mano (zip da GitHub Releases), quindi Chrome non aggiorna nulla:
+// l'unica cosa che possiamo fare è accorgercene e dirlo.
+
+async function checkUpdate() {
+  try {
+    const r = await fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const { tag_name, html_url } = await r.json();
+    const latest = String(tag_name || '').replace(/^v/, '');
+    if (!/^\d+(\.\d+)*$/.test(latest)) return;
+    const has = newer(latest, chrome.runtime.getManifest().version);
+    await set({ update: has ? { version: latest, url: html_url } : null });
+    // Badge di default: vale sulle tab dove nessun content script ha ancora parlato.
+    if (has) {
+      chrome.action.setBadgeText({ text: '!' });
+      chrome.action.setBadgeBackgroundColor({ color: BADGE_UPDATE });
+    }
+  } catch { /* offline o rate limit di GitHub: si riprova al prossimo giro */ }
+}
+
+// "1.10.0" è più recente di "1.9.0": confronto campo per campo, non lessicografico.
+function newer(a, b) {
+  const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d > 0;
+  }
+  return false;
+}
 
 // Il service worker può essere terminato a metà crawl: qui si riprende la coda.
 async function resume() {
@@ -41,18 +81,15 @@ async function resume() {
 // --- fetch dal portale -----------------------------------------------------
 
 class LoginError extends Error {
-  // reason: 'nocreds' (credentials.json assente/incompleto) | 'failed' (credenziali rifiutate)
+  // reason: 'nocreds' (non ancora inserite in dashboard) | 'failed' (rifiutate dal portale)
   constructor(reason) { super(reason); this.reason = reason; }
 }
 
-// Credenziali del portale: file nella cartella dell'estensione, fuori dal repo.
-// Non è in web_accessible_resources, quindi lo legge solo l'estensione.
+// Credenziali del portale: le scrive l'utente nella dashboard e restano in
+// chrome.storage.local, su questo computer. Mai nel repo né nel pacchetto.
 async function creds() {
-  try {
-    const r = await fetch(chrome.runtime.getURL('credentials.json'));
-    const c = await r.json();
-    return c && c.email && c.password ? c : null;
-  } catch { return null; }
+  const { creds: c } = await get('creds');
+  return c && c.email && c.password ? c : null;
 }
 
 // Il form del portale è POST /login con campi loginData[...], senza CSRF token.
@@ -323,6 +360,79 @@ async function rebuildRev() {
   await set({ ridx: { dom, name } });
 }
 
+// --- Klarna ----------------------------------------------------------------
+// Terza fonte: i negozi Klarna che danno cashback. Il cashback non è automatico al
+// checkout del sito — si sblocca solo comprando dentro la Klarna app — quindi qui è
+// un promemoria, non un'azione: nessun bottone, come per Revolut.
+
+const nameKey = s => norm(s).replace(/ /g, '');
+const cleanDomain = s => String(s || '').toLowerCase()
+  .replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0] || null;
+
+// Il tasso arriva in centesimi di punto (150 = 1,5%). Il dominio vero sta solo dentro
+// otcUrl (?merchantUrl=unieuro.it): storeUrl è uno slug di klarna.com, non del negozio.
+function klOffer(s) {
+  const cb = s && s.cashbackDiscount;
+  const rate = cb && +cb.discountPercentage / 100;
+  const name = s && s.displayName;
+  if (!rate || !name) return null;
+  const m = /merchantUrl=([^&]+)/.exec(s.otcUrl || '');
+  let domain = null;
+  if (m) { try { domain = cleanDomain(decodeURIComponent(m[1])); } catch { domain = cleanDomain(m[1]); } }
+  return {
+    name, name_key: nameKey(name), rate, domain,
+    // "fino a": Klarna dichiara un tetto, non un tasso garantito. Meglio dirlo nel chip.
+    label: (cb.showUpToPrefix ? 'fino a ' : '') + rate.toLocaleString('it-IT') + '%'
+  };
+}
+
+async function syncKlarna() {
+  try {
+    // Klarna elenca lo stesso brand più volte con tassi diversi ("G-Star Raw" 4% e
+    // "G Star RAW" 2%): stessa chiave, si tiene il tasso migliore.
+    const best = new Map();
+    for (let offset = 0, total = KLARNA_PAGE; offset < total; offset += KLARNA_PAGE) {
+      const r = await fetch(
+        `${KLARNA_API}?sort=RANK&cashback=true&offset=${offset}&size=${KLARNA_PAGE}`);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      const page = Array.isArray(d.stores) ? d.stores : [];
+      if (!page.length) break;      // senza questo un totalHits gonfiato girerebbe a vuoto
+      total = Math.min(+d.totalHits || 0, 2000);
+      for (const s of page) {
+        const o = klOffer(s);
+        if (!o) continue;
+        const cur = best.get(o.name_key);
+        if (!cur || o.rate > cur.rate) best.set(o.name_key, o);
+      }
+    }
+    const offers = [...best.values()];
+    // Come per Revolut: solo una lista sensata sovrascrive la cache, altrimenti si tiene
+    // l'ultima buona. Una risposta vuota di Klarna non deve svuotare il catalogo.
+    if (!offers.length) throw new Error('nessun negozio con cashback nella risposta');
+    await set({
+      klarna: { offers, at: Date.now() },
+      klSync: { state: 'idle', at: Date.now() }
+    });
+    await rebuildKl();
+  } catch (e) {
+    await set({ klSync: { state: 'error', error: String(e && e.message || e), at: Date.now() } });
+  }
+}
+
+async function rebuildKl() {
+  const { klarna = { offers: [] }, klAliases = {} } = await get(['klarna', 'klAliases']);
+  const dom = {}, name = {};
+  for (const o of klarna.offers) {
+    if (o.domain) (dom[etld1(o.domain)] ||= []).push(o.name_key);
+    for (const k of nameKeys(o.name)) (name[k] ||= []).push(o.name_key);
+  }
+  for (const [d, keys] of Object.entries(klAliases)) {
+    for (const k of keys) (dom[d] ||= []).push(k);
+  }
+  await set({ kidx: { dom, name } });
+}
+
 // --- matching --------------------------------------------------------------
 
 function matchIds(hostname, idx) {
@@ -351,14 +461,14 @@ async function handle(msg, sender) {
 
   if (msg.type === 'check') {
     const st = await get(['catalog', 'idx', 'blocked', 'muted', 'snooze', 'sync',
-      'revolut', 'ridx', 'revBlocked']);
+      'revolut', 'ridx', 'revBlocked', 'klarna', 'kidx', 'klBlocked', 'update']);
     const catalog = st.catalog || { offers: {} };
     const idx = st.idx || { dom: {}, name: {} };
     const d = etld1(msg.host);
     const needLogin = st.sync && (st.sync.state === 'login');
     const empty = Object.keys(catalog.offers).length === 0;
 
-    if ((st.muted || []).includes(d)) return { offers: [], rev: [], muted: true };
+    if ((st.muted || []).includes(d)) return { offers: [], rev: [], kl: [], muted: true };
 
     const blocked = new Set((st.blocked || {})[d] || []);
     const offers = matchIds(msg.host, idx)
@@ -367,25 +477,35 @@ async function handle(msg, sender) {
       .sort((a, b) => (b.k === 'shop') - (a.k === 'shop'))
       .slice(0, 5);
 
-    const revAll = (st.revolut || {}).offers || [];
-    const revBlocked = new Set((st.revBlocked || {})[d] || []);
-    const byKey = Object.fromEntries(revAll.map(o => [o.name_key, o]));
-    const rev = [...new Set(matchIds(msg.host, st.ridx || { dom: {}, name: {} }))]
-      .filter(k => !revBlocked.has(k) && byKey[k])
-      .map(k => byKey[k])
-      .sort((a, b) => b.rate - a.rate)
-      .slice(0, 3);
+    // Revolut e Klarna hanno la stessa forma: una lista di negozi con name_key.
+    const byName = (list, idx, blk) => {
+      const byKey = Object.fromEntries(list.map(o => [o.name_key, o]));
+      const hidden = new Set(blk[d] || []);
+      return [...new Set(matchIds(msg.host, idx || { dom: {}, name: {} }))]
+        .filter(k => !hidden.has(k) && byKey[k])
+        .map(k => byKey[k])
+        .sort((a, b) => b.rate - a.rate)
+        .slice(0, 3);
+    };
+    const rev = byName((st.revolut || {}).offers || [], st.ridx, st.revBlocked || {});
+    const kl = byName((st.klarna || {}).offers || [], st.kidx, st.klBlocked || {});
 
     if (tabId != null) {
       const skip = () => {};   // la tab può sparire mentre rispondiamo
-      const n = offers.length + rev.length;
-      chrome.action.setBadgeText({ tabId, text: n ? String(n) : '' }).catch(skip);
-      chrome.action.setBadgeBackgroundColor({ tabId, color: needLogin ? '#b45309' : '#16a34a' }).catch(skip);
+      const n = offers.length + rev.length + kl.length;
+      // Su un sito convenzionato vince il conteggio: è il motivo per cui l'estensione
+      // esiste. Il "!" della nuova versione occupa il badge solo dove non c'è altro.
+      const upd = !!st.update;
+      chrome.action.setBadgeText({ tabId, text: n ? String(n) : upd ? '!' : '' }).catch(skip);
+      chrome.action.setBadgeBackgroundColor({
+        tabId,
+        color: n ? (needLogin ? '#b45309' : '#16a34a') : BADGE_UPDATE
+      }).catch(skip);
     }
 
     const until = (st.snooze || {})[d] || 0;
     return {
-      offers, rev, needLogin, empty, domain: d,
+      offers, rev, kl, needLogin, empty, domain: d,
       snoozed: Date.now() < until,
       stale: catalog.updatedAt ? Date.now() - catalog.updatedAt > 3 * NUDGE_MS : false
     };
@@ -442,6 +562,14 @@ async function handle(msg, sender) {
       revBlocked[msg.domain] = [...rl];
       await set({ revBlocked });
     }
+
+    if ((msg.klKeys || []).length) {
+      const { klBlocked = {} } = await get('klBlocked');
+      const kl = new Set(klBlocked[msg.domain] || []);
+      msg.klKeys.forEach(k => kl.add(k));
+      klBlocked[msg.domain] = [...kl];
+      await set({ klBlocked });
+    }
     return { ok: true };
   }
 
@@ -466,10 +594,29 @@ async function handle(msg, sender) {
 
   if (msg.type === 'sync') { sync(); return { ok: true }; }
 
-  // Le due fonti sono indipendenti: partono insieme, il crawl CB è lento e Revolut no.
-  if (msg.type === 'syncAll') { sync(); syncRevolut(); return { ok: true }; }
+  // Le tre fonti sono indipendenti: partono insieme, il crawl CB è lento e le altre no.
+  if (msg.type === 'syncAll') { sync(); syncRevolut(); syncKlarna(); return { ok: true }; }
 
   if (msg.type === 'revSync') { await syncRevolut(); return { ok: true }; }
+
+  if (msg.type === 'klSync') { await syncKlarna(); return { ok: true }; }
+
+  if (msg.type === 'klAlias') {         // collega a mano un negozio Klarna a un dominio
+    const { klAliases = {} } = await get('klAliases');
+    const d = etld1(msg.domain);
+    klAliases[d] = [...new Set([...(klAliases[d] || []), msg.key])];
+    await set({ klAliases });
+    await rebuildKl();
+    return { ok: true };
+  }
+
+  if (msg.type === 'klUnreport') {
+    const { klBlocked = {} } = await get('klBlocked');
+    klBlocked[msg.domain] = (klBlocked[msg.domain] || []).filter(k => k !== msg.key);
+    if (!klBlocked[msg.domain].length) delete klBlocked[msg.domain];
+    await set({ klBlocked });
+    return { ok: true };
+  }
 
   if (msg.type === 'revAlias') {        // collega a mano un negozio Revolut a un dominio
     const { revAliases = {} } = await get('revAliases');
@@ -488,11 +635,27 @@ async function handle(msg, sender) {
     return { ok: true };
   }
 
+  if (msg.type === 'setCreds') {
+    const email = (msg.email || '').trim();
+    // Password vuota = "lascia quella che c'è": la dashboard non la rilegge mai.
+    const { creds: cur = {} } = await get('creds');
+    const password = msg.password || cur.password || '';
+    if (!email || !password) return { error: 'Servono email e password' };
+    await set({ creds: { email, password } });
+    return { ok: true };
+  }
+
+  if (msg.type === 'clearCreds') {
+    await chrome.storage.local.remove('creds');
+    return { ok: true };
+  }
+
   if (msg.type === 'state') {
     const st = await get(['catalog', 'sync', 'blocked', 'muted', 'aliases',
-      'revolut', 'revSync', 'revBlocked']);
+      'revolut', 'revSync', 'revBlocked', 'klarna', 'klSync', 'klBlocked', 'creds', 'update']);
     const offers = (st.catalog || {}).offers || {};
     const revolut = st.revolut || { offers: [] };
+    const klarna = st.klarna || { offers: [] };
     return {
       sync: st.sync || { state: 'idle' },
       updatedAt: (st.catalog || {}).updatedAt || 0,
@@ -505,7 +668,14 @@ async function handle(msg, sender) {
       offers,
       revolut: { offers: revolut.offers || [], at: revolut.at || 0 },
       revSync: st.revSync || { state: 'idle' },
-      revBlocked: st.revBlocked || {}
+      revBlocked: st.revBlocked || {},
+      klarna: { offers: klarna.offers || [], at: klarna.at || 0 },
+      klSync: st.klSync || { state: 'idle' },
+      klBlocked: st.klBlocked || {},
+      // La password non esce mai da qui: la dashboard sa solo se c'è.
+      creds: { email: (st.creds || {}).email || '', saved: !!(st.creds || {}).password },
+      update: st.update || null,
+      version: chrome.runtime.getManifest().version
     };
   }
 

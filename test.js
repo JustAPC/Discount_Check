@@ -17,7 +17,7 @@ const ctx = {
   }
 };
 vm.createContext(ctx);
-vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, rebuildIdx: null };', ctx);
+vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, rebuildIdx: null };', ctx);
 const T = ctx.__T;
 
 let fail = 0;
@@ -60,6 +60,26 @@ eq('parseOffer negozio fisico', T.parseOffer(local, '/offer/1/cat/2').v.k, 'none
 eq('etld1 www', T.etld1('www.thespacecinema.it'), 'thespacecinema.it');
 eq('etld1 sub', T.etld1('webstore.northsails.com'), 'northsails.com');
 eq('etld1 co.uk', T.etld1('shop.marksandspencer.co.uk'), 'marksandspencer.co.uk');
+
+// --- klOffer: record veri dell'API Klarna -----------------------------------
+// Il tasso è in centesimi di punto e il dominio esiste solo dentro otcUrl.
+const klStore = (name, pct, otc, upTo = true) => ({
+  displayName: name,
+  cashbackDiscount: { discountPercentage: pct, showUpToPrefix: upTo },
+  otcUrl: otc
+});
+eq('klOffer 150 → fino a 1,5%',
+  T.klOffer(klStore('Unieuro', 150,
+    'https://app.klarna.com/one-time-card/start?merchantUrl=unieuro.it&origin=x')),
+  { name: 'Unieuro', name_key: 'unieuro', rate: 1.5, domain: 'unieuro.it', label: 'fino a 1,5%' });
+eq('klOffer nome composto → chiave senza spazi',
+  T.klOffer(klStore('Foot Locker', 400, '?merchantUrl=www.footlocker.it')).name_key, 'footlocker');
+eq('klOffer senza "fino a"',
+  T.klOffer(klStore('Temu', 700, '?merchantUrl=temu.com', false)).label, '7%');
+eq('klOffer senza cashback scartato',
+  T.klOffer({ displayName: 'Zalando', cashbackDiscount: null, otcUrl: '?merchantUrl=zalando.it' }), null);
+eq('klOffer senza otcUrl resta senza dominio',
+  T.klOffer({ displayName: 'X', cashbackDiscount: { discountPercentage: 200 }, otcUrl: null }).domain, null);
 
 // --- matching su titoli reali del portale ----------------------------------
 const titoli = {

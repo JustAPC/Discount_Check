@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Discount Check",
-  "version": "1.0.0",
-  "description": "Ricorda sconti Corporate Benefits e punti Revolut mentre fai acquisti online.",
+  "version": "1.0.1",
+  "description": "Ricorda sconti Corporate Benefits, punti Revolut e cashback Klarna mentre fai acquisti online.",
   "permissions": ["storage", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },
