@@ -6,18 +6,28 @@ const path = require('path');
 const src = fs.readFileSync(path.join(__dirname, 'background.js'), 'utf8');
 const noop = () => {};
 const listener = { addListener: noop };
+// chrome.storage.local finto ma vero: i test su checkHost gli scrivono dentro.
+let store = {};
 const ctx = {
   console,
   URL, TextDecoder, fetch: () => Promise.resolve({ text: () => Promise.resolve('') }),
   chrome: {
     runtime: { onInstalled: listener, onStartup: listener, onMessage: listener },
     alarms: { onAlarm: listener, create: noop },
-    storage: { local: { get: () => Promise.resolve({}), set: () => Promise.resolve() } },
-    action: {}, tabs: {}
+    storage: {
+      local: {
+        get: k => Promise.resolve(Object.fromEntries(
+          (Array.isArray(k) ? k : [k]).filter(x => x in store).map(x => [x, store[x]]))),
+        set: o => { Object.assign(store, o); return Promise.resolve(); }
+      }
+    },
+    action: {}, scripting: {},
+    tabs: { onUpdated: listener },
+    permissions: { contains: () => Promise.resolve(true) }
   }
 };
 vm.createContext(ctx);
-vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, rebuildIdx: null };', ctx);
+vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost };', ctx);
 const T = ctx.__T;
 
 let fail = 0;
@@ -117,5 +127,40 @@ const negativi = ['amazon.it', 'ebay.it', 'subito.it', 'github.com', 'poste.it',
   'bershka.com', 'douglas.it', 'lidl.it', 'conad.it', 'fnac.it', 'vinted.it'];
 eq('match: nessun falso positivo', negativi.filter(h => m(h).length), []);
 
-console.log(fail ? `\n${fail} test falliti` : '\nTutti i test passati');
-process.exit(fail ? 1 : 0);
+// --- checkHost: da qui dipende se il content script viene iniettato ---------
+// Prima girava su ogni pagina e decideva lui; ora un errore qui è un'estensione muta
+// (o, al contrario, codice iniettato dove non serve).
+
+(async () => {
+  const has = r => r.offers.length + r.rev.length + r.kl.length;
+
+  store = {};
+  const vuoto = await T.checkHost('zalando.it');
+  eq('checkHost: catalogo mai scaricato', [vuoto.empty, has(vuoto)], [true, 0]);
+
+  store = {
+    catalog: { offers: { 2: { c: '9', t: 'Zalando Gift Card', d: '5% Sconto', h: '', k: 'giftcard', p: 2 } } },
+    idx: { dom: {}, name: { zalando: ['2'] } },
+    revolut: { offers: [{ name: 'Zalando', name_key: 'zalando', rate: 3, label: '3x', domain: 'zalando.it' }] },
+    ridx: { dom: { 'zalando.it': ['zalando'] }, name: {} }
+  };
+  const hit = await T.checkHost('www.zalando.it');
+  eq('checkHost: due fonti sullo stesso dominio',
+    [hit.empty, hit.offers.length, hit.rev.length, hit.domain], [false, 1, 1, 'zalando.it']);
+
+  const altro = await T.checkHost('amazon.it');
+  eq('checkHost: sito senza vantaggi', has(altro), 0);
+
+  store.muted = ['zalando.it'];
+  const zitto = await T.checkHost('www.zalando.it');
+  eq('checkHost: sito silenziato', [zitto.muted, has(zitto)], [true, 0]);
+
+  delete store.muted;
+  store.blocked = { 'zalando.it': ['2'] };
+  store.revBlocked = { 'zalando.it': ['zalando'] };
+  const bloccato = await T.checkHost('www.zalando.it');
+  eq('checkHost: falsi positivi segnalati', has(bloccato), 0);
+
+  console.log(fail ? `\n${fail} test falliti` : '\nTutti i test passati');
+  process.exit(fail ? 1 : 0);
+})();

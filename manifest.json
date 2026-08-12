@@ -3,8 +3,14 @@
   "name": "Discount Check",
   "version": "1.0.9",
   "description": "Ricorda sconti Corporate Benefits, punti Revolut e cashback Klarna mentre fai acquisti online.",
-  "permissions": ["storage", "alarms"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": ["storage", "alarms", "scripting"],
+  "host_permissions": [
+    "https://*.convenzioniaziendali.it/*",
+    "https://sconti-api.andreapontillo.tech/*",
+    "https://www.klarna.com/*",
+    "https://justapc.github.io/*"
+  ],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "background.js" },
   "icons": {
     "16": "icons/icon16.png",
@@ -21,13 +27,5 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
-  },
-  "content_scripts": [
-    {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js"],
-      "run_at": "document_idle",
-      "all_frames": false
-    }
-  ]
+  }
 }

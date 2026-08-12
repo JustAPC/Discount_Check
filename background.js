@@ -571,94 +571,154 @@ function matchIds(hostname, idx) {
   return [...ids];
 }
 
+// --- iniezione condizionale ------------------------------------------------
+// Il content script non sta più su ogni pagina che apri: qui si guarda l'hostname
+// della tab contro gli indici che abbiamo già e si inietta solo dove c'è davvero
+// qualcosa da dire. Sui siti non convenzionati non gira una riga di codice nostro.
+//
+// L'accesso ai siti è un permesso opzionale: finché non lo concedi dalla dashboard,
+// tab.url arriva vuoto e questo listener non fa nulla — nessun errore, solo silenzio.
+
+const SHOP_ORIGINS = { origins: ["http://*/*", "https://*/*"] };
+
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  // "complete" = caricamento vero finito; un url senza status = navigazione SPA.
+  // L'url che accompagna lo status "loading" si scarta apposta: è lo stesso evento
+  // di "complete" visto due volte, e ci farebbe rileggere lo storage per niente.
+  if (info.status ? info.status !== "complete" : !info.url) return;
+  const url = info.url || (tab && tab.url) || "";
+  if (!/^https?:/.test(url)) return;
+  visit(tabId, url).catch(() => {
+    /* tab sparita a metà: non è un errore */
+  });
+});
+
+async function visit(tabId, url) {
+  let host;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return;
+  }
+  const res = await checkHost(host);
+  // Il badge si aggiorna comunque: prima dipendeva dal content script, quindi sui siti
+  // dove non veniva mostrato niente restava quello della tab precedente.
+  setBadge(tabId, res);
+  if (res.muted) return;
+
+  const has = res.offers.length || res.rev.length || res.kl.length;
+  // Catalogo mai scaricato: la card di setup esce al massimo una volta al giorno, quindi
+  // fuori da quella finestra non vale la pena iniettare per poi non mostrare nulla.
+  if (!has && !(res.empty && (await nudgeOpen()))) return;
+  // "Ricordamelo dopo": per due ore la card non uscirebbe comunque. Il badge sì, ed è
+  // già stato messo sopra — chi ha messo lo snooze può ancora aprire la dashboard.
+  if (has && res.snoozed && !res.needLogin) return;
+
+  try {
+    // content.js si difende da solo dalla doppia iniezione (SPA che rinavigano).
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+  } catch {
+    /* tab chiusa, pagina protetta dal browser, permesso revocato */
+  }
+}
+
+function setBadge(tabId, res) {
+  const skip = () => {}; // la tab può sparire mentre rispondiamo
+  const n = res.muted ? 0 : res.offers.length + res.rev.length + res.kl.length;
+  // Su un sito convenzionato vince il conteggio: è il motivo per cui l'estensione
+  // esiste. Il "!" della nuova versione occupa il badge solo dove non c'è altro.
+  chrome.action.setBadgeText({ tabId, text: n ? String(n) : res.upd ? "!" : "" }).catch(skip);
+  chrome.action
+    .setBadgeBackgroundColor({
+      tabId,
+      color: n ? (res.needLogin ? "#b45309" : "#16a34a") : BADGE_UPDATE,
+    })
+    .catch(skip);
+}
+
+async function nudgeOpen() {
+  const { lastNudge = 0 } = await get("lastNudge");
+  return Date.now() - lastNudge >= NUDGE_MS;
+}
+
+// Cosa abbiamo per questo hostname. La usano sia il listener sulle tab (per decidere
+// se iniettare) sia il content script una volta iniettato: una regola sola.
+async function checkHost(host) {
+  const st = await get([
+    "catalog",
+    "idx",
+    "blocked",
+    "muted",
+    "snooze",
+    "sync",
+    "revolut",
+    "ridx",
+    "revBlocked",
+    "klarna",
+    "kidx",
+    "klBlocked",
+    "update",
+  ]);
+  const catalog = st.catalog || { offers: {} };
+  const d = etld1(host);
+  const base = {
+    offers: [],
+    rev: [],
+    kl: [],
+    domain: d,
+    upd: !!st.update,
+    needLogin: !!(st.sync && st.sync.state === "login"),
+    empty: Object.keys(catalog.offers).length === 0,
+  };
+
+  if ((st.muted || []).includes(d)) return { ...base, muted: true };
+
+  const blocked = new Set((st.blocked || {})[d] || []);
+  const offers = matchIds(host, st.idx || { dom: {}, name: {} })
+    .filter((id) => !blocked.has(id) && catalog.offers[id])
+    .map((id) => ({ id, ...catalog.offers[id] }))
+    .sort((a, b) => (b.k === "shop") - (a.k === "shop"))
+    .slice(0, 5);
+
+  // Revolut e Klarna hanno la stessa forma: una lista di negozi con name_key.
+  const byName = (list, idx, blk) => {
+    const byKey = Object.fromEntries(list.map((o) => [o.name_key, o]));
+    const hidden = new Set(blk[d] || []);
+    return [...new Set(matchIds(host, idx || { dom: {}, name: {} }))]
+      .filter((k) => !hidden.has(k) && byKey[k])
+      .map((k) => byKey[k])
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 3);
+  };
+
+  const until = (st.snooze || {})[d] || 0;
+  return {
+    ...base,
+    offers,
+    rev: byName((st.revolut || {}).offers || [], st.ridx, st.revBlocked || {}),
+    kl: byName((st.klarna || {}).offers || [], st.kidx, st.klBlocked || {}),
+    snoozed: Date.now() < until,
+    stale: catalog.updatedAt ? Date.now() - catalog.updatedAt > 3 * NUDGE_MS : false,
+  };
+}
+
 // --- messaggi dal content script / dashboard -------------------------------
 
-chrome.runtime.onMessage.addListener((msg, sender, reply) => {
-  handle(msg, sender)
+chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+  handle(msg)
     .then(reply)
     .catch((e) => reply({ error: String((e && e.message) || e) }));
   return true;
 });
 
-async function handle(msg, sender) {
-  const tabId = sender.tab && sender.tab.id;
-
-  if (msg.type === "check") {
-    const st = await get([
-      "catalog",
-      "idx",
-      "blocked",
-      "muted",
-      "snooze",
-      "sync",
-      "revolut",
-      "ridx",
-      "revBlocked",
-      "klarna",
-      "kidx",
-      "klBlocked",
-      "update",
-    ]);
-    const catalog = st.catalog || { offers: {} };
-    const idx = st.idx || { dom: {}, name: {} };
-    const d = etld1(msg.host);
-    const needLogin = st.sync && st.sync.state === "login";
-    const empty = Object.keys(catalog.offers).length === 0;
-
-    if ((st.muted || []).includes(d)) return { offers: [], rev: [], kl: [], muted: true };
-
-    const blocked = new Set((st.blocked || {})[d] || []);
-    const offers = matchIds(msg.host, idx)
-      .filter((id) => !blocked.has(id) && catalog.offers[id])
-      .map((id) => ({ id, ...catalog.offers[id] }))
-      .sort((a, b) => (b.k === "shop") - (a.k === "shop"))
-      .slice(0, 5);
-
-    // Revolut e Klarna hanno la stessa forma: una lista di negozi con name_key.
-    const byName = (list, idx, blk) => {
-      const byKey = Object.fromEntries(list.map((o) => [o.name_key, o]));
-      const hidden = new Set(blk[d] || []);
-      return [...new Set(matchIds(msg.host, idx || { dom: {}, name: {} }))]
-        .filter((k) => !hidden.has(k) && byKey[k])
-        .map((k) => byKey[k])
-        .sort((a, b) => b.rate - a.rate)
-        .slice(0, 3);
-    };
-    const rev = byName((st.revolut || {}).offers || [], st.ridx, st.revBlocked || {});
-    const kl = byName((st.klarna || {}).offers || [], st.kidx, st.klBlocked || {});
-
-    if (tabId != null) {
-      const skip = () => {}; // la tab può sparire mentre rispondiamo
-      const n = offers.length + rev.length + kl.length;
-      // Su un sito convenzionato vince il conteggio: è il motivo per cui l'estensione
-      // esiste. Il "!" della nuova versione occupa il badge solo dove non c'è altro.
-      const upd = !!st.update;
-      chrome.action.setBadgeText({ tabId, text: n ? String(n) : upd ? "!" : "" }).catch(skip);
-      chrome.action
-        .setBadgeBackgroundColor({
-          tabId,
-          color: n ? (needLogin ? "#b45309" : "#16a34a") : BADGE_UPDATE,
-        })
-        .catch(skip);
-    }
-
-    const until = (st.snooze || {})[d] || 0;
-    return {
-      offers,
-      rev,
-      kl,
-      needLogin,
-      empty,
-      domain: d,
-      snoozed: Date.now() < until,
-      stale: catalog.updatedAt ? Date.now() - catalog.updatedAt > 3 * NUDGE_MS : false,
-    };
-  }
+async function handle(msg) {
+  // Il badge lo ha già messo visit(): qui si risponde solo al content script,
+  // che a questo punto è già stato iniettato proprio perché c'era qualcosa.
+  if (msg.type === "check") return checkHost(msg.host);
 
   if (msg.type === "nudge") {
     // catalogo vuoto: avviso max 1 volta al giorno
-    const { lastNudge = 0 } = await get("lastNudge");
-    if (Date.now() - lastNudge < NUDGE_MS) return { show: false };
+    if (!(await nudgeOpen())) return { show: false };
     await set({ lastNudge: Date.now() });
     return { show: true };
   }
@@ -855,6 +915,9 @@ async function handle(msg, sender) {
       creds: { email: (st.creds || {}).email || "", saved: !!(st.creds || {}).password },
       update: st.update || null,
       version: chrome.runtime.getManifest().version,
+      // Senza questo permesso l'estensione non si fa viva su nessun sito: la dashboard
+      // deve poterlo dire, perché da fuori sembrerebbe solo che non trova mai niente.
+      shopAccess: await chrome.permissions.contains(SHOP_ORIGINS),
     };
   }
 

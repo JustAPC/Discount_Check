@@ -92,7 +92,21 @@ Scaricano e scompattano in `Documenti/discount-check`, poi aprono la cartella.
 Il browser carica l'estensione **da quella cartella**, non ne fa una copia: non spostarla e non
 cancellarla.
 
-### 3. Inserisci le credenziali del portale
+### 3. Consenti l'accesso ai siti di shopping
+
+Clicca l'icona dell'estensione: in cima alla dashboard trovi **"Accesso ai siti non concesso"** →
+**Consenti sui siti di shopping** → **Consenti** nella finestra del browser.
+
+Senza questo permesso l'estensione funziona a metà: scarica i cataloghi e la ricerca nella dashboard
+va, ma al checkout non compare niente, perché non può sapere su che sito sei.
+
+È un permesso **opzionale** e non viene chiesto all'installazione, così il browser non ti mette
+davanti "Leggi e modifica tutti i tuoi dati su tutti i siti web" prima ancora che tu abbia capito a
+cosa serve. In pratica l'estensione non esegue codice sulle pagine che non c'entrano nulla: il
+controllo lo fa il service worker sul solo indirizzo del sito, e il popup viene caricato **solo**
+sulle pagine dove c'è davvero una convenzione, un moltiplicatore Revolut o un cashback Klarna.
+
+### 4. Inserisci le credenziali del portale
 
 Clicca l'icona dell'estensione → **Apri dashboard** → sezione **Accesso al portale** → email e
 password del portale Corporate Benefits → **Salva**.
@@ -101,7 +115,7 @@ Sono le stesse con cui accedi al sito. Restano in `chrome.storage.local`, su que
 sono nel repo né nel pacchetto, e ogni installazione ha le sue. La dashboard non le rilegge mai — il
 campo password ti dice solo se è salvata.
 
-### 4. Primo aggiornamento del catalogo
+### 5. Primo aggiornamento del catalogo
 
 Premi **Aggiorna tutto**. Il primo crawl del portale scarica ~900 offerte e dura qualche minuto:
 puoi chiudere la dashboard, va avanti da solo. Revolut e Klarna sono immediati.

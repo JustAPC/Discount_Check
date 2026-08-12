@@ -1,6 +1,11 @@
 // Discount Check - rileva il checkout e mostra il reminder.
 (() => {
   if (window.top !== window) return;
+  // Non è più un content script dichiarato nel manifest: lo inietta il background a
+  // ogni navigazione utile, e su una SPA la stessa pagina può riceverne più di una.
+  // Il mondo isolato sopravvive alle navigazioni via history, questo flag anche.
+  if (window.__discountCheck) return;
+  window.__discountCheck = true;
 
   const CHECKOUT_URL =
     /(checkout|\/cart|carrello|basket|panier|kasse|pagamento|payment|\/order|ordine|riepilogo)/i;

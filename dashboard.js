@@ -61,6 +61,9 @@ async function refresh() {
     : `aggiornato ${fmt(S.updatedAt)}`;
 
   $('warn').innerHTML = '';
+  // Prima di tutto il resto: senza accesso ai siti il catalogo può essere perfetto e
+  // l'estensione resterà comunque muta al checkout. È la causa che spiega tutte le altre.
+  if (S.shopAccess === false) renderShopAccess();
   if (st.state === 'login') {
     const body = warn(
       st.reason === 'nocreds' ? 'Credenziali mancanti'
@@ -125,6 +128,28 @@ function warn(title, text, kind) {
   d.appendChild(body);
   $('warn').appendChild(d);
   return body;
+}
+
+// --- accesso ai siti -----------------------------------------------------------
+// L'accesso a "tutti i siti" è un permesso opzionale: all'installazione l'estensione
+// non lo chiede, così il browser non mostra l'avviso più spaventoso che esista. Lo si
+// concede da qui, quando si è capito a cosa serve.
+
+const SHOP_ORIGINS = { origins: ['http://*/*', 'https://*/*'] };
+
+function renderShopAccess() {
+  const body = warn('Accesso ai siti non concesso',
+    'Il catalogo si aggiorna lo stesso e la ricerca qui dentro funziona, ma al checkout ' +
+    'non comparirà nulla: senza questo permesso non posso leggere su che sito sei.');
+  const b = el('button', 'btn primary', 'Consenti sui siti di shopping');
+  b.onclick = async () => {
+    // Va chiesto da un gesto dell'utente. Chrome può chiudere il popup mentre mostra
+    // la sua finestra: se succede, alla riapertura l'avviso semplicemente non c'è più.
+    try {
+      if (await chrome.permissions.request(SHOP_ORIGINS)) refresh();
+    } catch { /* popup chiuso sotto i piedi: niente da fare qui */ }
+  };
+  body.appendChild(b);
 }
 
 // Nessuna risposta dal background: schermata onesta con un modo per riprovare.
