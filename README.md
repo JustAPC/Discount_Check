@@ -74,7 +74,9 @@ Non si usa: si fa vedere lei.
   Il badge dice che c'è qualcosa, questo dice *che cosa* — e da qui togli un abbinamento sbagliato
   senza dover arrivare a un checkout
 - **Dashboard** per cercare nel catalogo, collegare a mano un'offerta a un sito, silenziare i siti
-  che non ti interessano e correggere gli abbinamenti sbagliati
+  che non ti interessano e correggere gli abbinamenti sbagliati. Ogni cosa che aggiungi o togli
+  ha la sua sezione — **Collegamenti manuali**, **Segnalazioni di errore**, **Siti silenziati** —
+  e da lì si disfa
 
 I bottoni **Aggiorna Revolut** e **Aggiorna Klarna** aggiornano solo quella fonte, senza aspettare
 il crawl lungo del portale. **Aggiorna tutto** le muove tutte e tre.
@@ -120,7 +122,9 @@ Se il negozio è di Revolut, il rimedio definitivo è un altro: scrivergli il do
 ma per chiunque abbia l'estensione, entro 24 ore. Vedi [hermes-skill](hermes-skill/SKILL.md).
 
 **Nota:** "collega a un sito" non serve a questo. Aggiunge un dominio a un negozio, non lo toglie
-da un altro.
+da un altro. Se lo usi per sbaglio, lo trovi in **Collegamenti manuali** e lo stacchi. E se il
+negozio è di Revolut o Klarna e il catalogo sa già dov'è, il collegamento non viene nemmeno
+creato: la dashboard te lo dice invece di far finta di averlo fatto.
 
 ---
 

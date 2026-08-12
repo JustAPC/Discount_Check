@@ -621,6 +621,16 @@
       .alias .btn {
         padding: 7px 10px;
       }
+      /* Dopo il collegamento resta una riga che dice cos'e' successo: premere un bottone
+         e non vedere niente e' il modo piu' veloce per non fidarsi piu' di un comando. */
+      .alias-msg {
+        padding: 4px 0 10px;
+        font-size: 11px;
+        color: var(--ink-2);
+      }
+      .alias-msg.warn {
+        color: var(--warn-ink);
+      }
 
       /* --- credenziali --------------------------------------------------------- */
       /* Il padding a sinistra del campo di ricerca lascia posto all'icona: qui no. */
@@ -826,6 +836,16 @@
             </div>
             <div id="kl-list"></div>
           </div>
+        </details>
+
+        <details id="d-aliases">
+          <summary>
+            <svg class="ic"><use href="#i-chevron" /></svg>Collegamenti manuali<span
+              class="n"
+              id="n-aliases"
+            ></span>
+          </summary>
+          <div class="body" id="aliases"></div>
         </details>
 
         <details id="d-blocked">

@@ -458,6 +458,17 @@ function etld1(hostname) {
 // elencare a mano nike.it e nike.co.uk.
 const domLabel = (hostname) => etld1(hostname).split(".")[0].replace(/-/g, "");
 
+// Accetta sia "nike.it" sia l'URL intero incollato dalla barra. La dashboard già ripulisce
+// prima di mandare, ma etld1 da solo non lo fa: un path finito dentro la chiave produrrebbe
+// un alias che non matcha mai, e nessuno se ne accorgerebbe. Stessa tolleranza che ha
+// /revolut/domains sul server, così lo stesso incollato funziona nei due posti.
+const hostOf = (s) =>
+  String(s || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z]+:\/\//, "")
+    .split(/[/?#]/)[0];
+
 async function rebuild(catalog) {
   const { aliases = {} } = await get("aliases");
   const dom = {},
@@ -912,11 +923,21 @@ async function handle(msg) {
   if (msg.type === "alias") {
     // collega a mano un'offerta a un dominio
     const { aliases = {} } = await get("aliases");
-    const d = etld1(msg.domain);
+    const d = etld1(hostOf(msg.domain));
     aliases[d] = [...new Set([...(aliases[d] || []), msg.id])];
     await set({ aliases });
     // Come revAlias e klAlias: si scrive l'alias e si lascia ricostruire l'indice a
     // rebuild(), invece di rattoppare idx a mano. Una via sola per arrivarci.
+    const { catalog = { offers: {} } } = await get("catalog");
+    await rebuild(catalog);
+    return { ok: true, domain: d };
+  }
+
+  if (msg.type === "unalias") {
+    const { aliases = {} } = await get("aliases");
+    aliases[msg.domain] = (aliases[msg.domain] || []).filter((i) => i !== msg.id);
+    if (!aliases[msg.domain].length) delete aliases[msg.domain];
+    await set({ aliases });
     const { catalog = { offers: {} } } = await get("catalog");
     await rebuild(catalog);
     return { ok: true };
@@ -947,9 +968,20 @@ async function handle(msg) {
 
   if (msg.type === "klAlias") {
     // collega a mano un negozio Klarna a un dominio
-    const { klAliases = {} } = await get("klAliases");
-    const d = etld1(msg.domain);
+    const { klarna = { offers: [] }, klAliases = {} } = await get(["klarna", "klAliases"]);
+    const o = (klarna.offers || []).find((x) => x.name_key === msg.key);
+    if (o && o.domain) return { ok: true, superseded: o.domain };
+    const d = etld1(hostOf(msg.domain));
     klAliases[d] = [...new Set([...(klAliases[d] || []), msg.key])];
+    await set({ klAliases });
+    await rebuildKl();
+    return { ok: true, domain: d };
+  }
+
+  if (msg.type === "klUnalias") {
+    const { klAliases = {} } = await get("klAliases");
+    klAliases[msg.domain] = (klAliases[msg.domain] || []).filter((k) => k !== msg.key);
+    if (!klAliases[msg.domain].length) delete klAliases[msg.domain];
     await set({ klAliases });
     await rebuildKl();
     return { ok: true };
@@ -965,9 +997,23 @@ async function handle(msg) {
 
   if (msg.type === "revAlias") {
     // collega a mano un negozio Revolut a un dominio
-    const { revAliases = {} } = await get("revAliases");
-    const d = etld1(msg.domain);
+    const { revolut = { offers: [] }, revAliases = {} } = await get(["revolut", "revAliases"]);
+    // Se il catalogo sa già dov'è questo negozio, l'alias verrebbe cancellato dal primo
+    // rebuild: meglio non crearlo e dire perché, che lasciare l'utente davanti a un
+    // bottone premuto e a nessun effetto.
+    const o = (revolut.offers || []).find((x) => x.name_key === msg.key);
+    if (o && o.domain) return { ok: true, superseded: o.domain };
+    const d = etld1(hostOf(msg.domain));
     revAliases[d] = [...new Set([...(revAliases[d] || []), msg.key])];
+    await set({ revAliases });
+    await rebuildRev();
+    return { ok: true, domain: d };
+  }
+
+  if (msg.type === "revUnalias") {
+    const { revAliases = {} } = await get("revAliases");
+    revAliases[msg.domain] = (revAliases[msg.domain] || []).filter((k) => k !== msg.key);
+    if (!revAliases[msg.domain].length) delete revAliases[msg.domain];
     await set({ revAliases });
     await rebuildRev();
     return { ok: true };
@@ -1005,6 +1051,8 @@ async function handle(msg) {
       "blocked",
       "muted",
       "aliases",
+      "revAliases",
+      "klAliases",
       "revolut",
       "revSync",
       "revBlocked",
@@ -1025,6 +1073,8 @@ async function handle(msg) {
       blocked: st.blocked || {},
       muted: st.muted || [],
       aliases: st.aliases || {},
+      revAliases: st.revAliases || {},
+      klAliases: st.klAliases || {},
       offers,
       revolut: { offers: revolut.offers || [], at: revolut.at || 0 },
       revSync: st.revSync || { state: "idle" },

@@ -27,7 +27,7 @@ const ctx = {
   }
 };
 vm.createContext(ctx);
-vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild, collapsed, wordKeys, storeIndex, domLabel };', ctx);
+vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild, collapsed, wordKeys, storeIndex, domLabel, handle };', ctx);
 const T = ctx.__T;
 
 let fail = 0;
@@ -260,6 +260,35 @@ eq('storeIndex: alias ancora utile, tenuto',
   store.revBlocked = { 'zalando.it': ['zalando'] };
   const bloccato = await T.checkHost('www.zalando.it');
   eq('checkHost: falsi positivi segnalati', has(bloccato), 0);
+
+  // --- collegamenti manuali: creare, e soprattutto togliere ------------------
+  // Erano l'unica cosa che l'utente crea deliberatamente e l'unica senza un undo.
+
+  store = { catalog: { offers: { 7: { c: '1', t: 'Wizz Air', d: '', h: '', k: 'none', p: 2 } } } };
+  await T.handle({ type: 'alias', domain: 'https://www.wizzair.com/it-it', id: '7' });
+  eq('alias: normalizza l\'URL incollato', store.aliases, { 'wizzair.com': ['7'] });
+  eq('alias: entra nell\'indice', store.idx.dom['wizzair.com'], ['7']);
+
+  await T.handle({ type: 'unalias', domain: 'wizzair.com', id: '7' });
+  eq('unalias: via dallo storage, chiave vuota rimossa', store.aliases, {});
+  eq('unalias: via anche dall\'indice', store.idx.dom['wizzair.com'], undefined);
+
+  // Un negozio di cui il server sa gia' il dominio: l'alias verrebbe cancellato dal primo
+  // rebuild, quindi non si crea e si dice perche'.
+  store = { revolut: { offers: [
+    { name: 'Qatar Airways', name_key: 'qatarairways', domain: 'qatarairways.com' },
+    { name: 'Lounge by Zalando', name_key: 'loungebyzalando', domain: null }
+  ] } };
+  const sup = await T.handle({ type: 'revAlias', domain: 'esempio.it', key: 'qatarairways' });
+  eq('revAlias: il dominio del server vince, e lo dice', sup, { ok: true, superseded: 'qatarairways.com' });
+  eq('revAlias: e non scrive niente', store.revAliases, undefined);
+
+  const ok = await T.handle({ type: 'revAlias', domain: 'www.zalando-lounge.it', key: 'loungebyzalando' });
+  eq('revAlias: senza dominio noto si collega', [ok.ok, store.revAliases],
+    [true, { 'zalando-lounge.it': ['loungebyzalando'] }]);
+
+  await T.handle({ type: 'revUnalias', domain: 'zalando-lounge.it', key: 'loungebyzalando' });
+  eq('revUnalias: staccato', store.revAliases, {});
 
   console.log(fail ? `\n${fail} test falliti` : '\nTutti i test passati');
   process.exit(fail ? 1 : 0);

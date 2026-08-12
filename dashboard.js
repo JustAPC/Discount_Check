@@ -109,6 +109,8 @@ async function refresh() {
   $('s-kl').textContent = kl.length;
 
   const blocked = Object.entries(S.blocked).flatMap(([d, ids]) => ids.map(id => [d, id]));
+  const aliases = aliasRows();
+  $('n-aliases').textContent = aliases.length;
   $('n-cb').textContent = S.count;
   $('n-rev').textContent = rev.length;
   $('n-kl').textContent = kl.length;
@@ -123,6 +125,7 @@ async function refresh() {
   if ($('d-cb').open) renderCatalog();
   renderRevolut(rev);
   renderKlarna(kl);
+  renderAliases(aliases);
   renderBlocked(blocked);
   renderMuted();
   search();
@@ -423,11 +426,19 @@ function askDomain(afterRow, target) {
     const d = inp.value.trim().toLowerCase()
       .replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
     if (!d) { inp.focus(); return; }
-    await send(target.key
+    const r = await send(target.key
       ? { type: target.src === 'kl' ? 'klAlias' : 'revAlias', domain: d, key: target.key }
       : { type: 'alias', domain: d, id: target.id });
-    w.remove();
-    refresh();
+    // Il collegamento e' un gesto silenzioso: senza una riga di risposta non si distingue
+    // "fatto" da "non ha funzionato". E quando il catalogo sa gia' dov'e' il negozio,
+    // l'alias non viene creato affatto: dirlo e' l'unico modo di non farlo sembrare rotto.
+    w.innerHTML = '';
+    const sup = r && r.superseded;
+    w.appendChild(el('div', 'alias-msg' + (sup ? ' warn' : ''), sup
+      ? `Non serve: il catalogo ha già ${sup} per questo negozio, e vince sul collegamento manuale.`
+      : !r ? 'Estensione non raggiungibile: riprova.'
+      : `Collegato a ${r.domain || d}. Lo stacchi da "Collegamenti manuali".`));
+    setTimeout(() => { w.remove(); refresh(); }, 3200);
   };
   inp.onkeydown = e => {
     if (e.key === 'Enter') save.click();
@@ -498,6 +509,60 @@ function renderKlarna(list) {
   // Ordine per tasso: il senso della sezione è "dove mi conviene passare dall'app".
   for (const o of [...list].sort((a, b) => b.rate - a.rate || a.name.localeCompare(b.name))) {
     box.appendChild(storeRow(o, 'kl', ''));
+  }
+}
+
+// --- collegamenti manuali ---------------------------------------------------
+// Sono l'unica cosa che l'utente crea deliberatamente, ed erano l'unica senza un elenco
+// e senza un modo per toglierla: si scrivevano in storage e sparivano dalla vista.
+// Le tre fonti stanno insieme perché la domanda è una sola — "cosa ho collegato a mano?"
+// — e cambia solo il messaggio da mandare per staccarlo.
+
+function aliasRows() {
+  const nameOf = (list, k) => (list.find(o => o.name_key === k) || {}).name;
+  const rev = (S.revolut || {}).offers || [];
+  const kl = (S.klarna || {}).offers || [];
+  const rows = [];
+  for (const [d, ids] of Object.entries(S.aliases || {})) {
+    for (const id of ids) {
+      rows.push({ d, src: 'Corporate Benefits', label: (S.offers[id] || {}).t,
+        undo: { type: 'unalias', domain: d, id } });
+    }
+  }
+  for (const [d, keys] of Object.entries(S.revAliases || {})) {
+    for (const k of keys) {
+      rows.push({ d, src: 'Revolut', label: nameOf(rev, k),
+        undo: { type: 'revUnalias', domain: d, key: k } });
+    }
+  }
+  for (const [d, keys] of Object.entries(S.klAliases || {})) {
+    for (const k of keys) {
+      rows.push({ d, src: 'Klarna', label: nameOf(kl, k),
+        undo: { type: 'klUnalias', domain: d, key: k } });
+    }
+  }
+  return rows.sort((a, b) => a.d.localeCompare(b.d));
+}
+
+function renderAliases(rows) {
+  const box = $('aliases');
+  box.innerHTML = '';
+  if (!rows.length) {
+    const e = el('div', 'empty');
+    e.append(el('b', null, 'Nessun collegamento manuale'),
+      'Quando cerchi un negozio e usi "Collega a un sito", il collegamento finisce qui. ' +
+      'Vince su qualunque euristica, e da qui lo stacchi.');
+    box.appendChild(e);
+    return;
+  }
+  for (const r of rows) {
+    const row = el('div', 'item');
+    const t = el('div', 't');
+    t.append(el('b', null, r.label || '(negozio non più in catalogo)'),
+      el('div', 'm', `${r.src} · collegato a ${r.d}`));
+    row.append(t, act('undo', 'Stacca questo collegamento',
+      async () => { await send(r.undo); refresh(); }));
+    box.appendChild(row);
   }
 }
 

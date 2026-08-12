@@ -96,9 +96,9 @@ stesso acquisto si può passare dal portale *e* pagare con Revolut.
    Il badge sull'icona è il grado più basso della stessa scala: si vede su ogni tab, quindi un
    falso positivo lì costa più che nella card.
 2. **Le tre fonti restano distinte e visibilmente sommabili.** Mai un badge generico "sconto".
-3. **Ogni automatismo è disfabile dall'utente**, e il posto dove si disfa è il popup.
-   *Debito aperto:* gli alias manuali sono l'unica cosa che l'utente crea deliberatamente e
-   l'unica che non può ancora togliere — non esistono né un elenco né un `unalias`.
+3. **Ogni automatismo è disfabile dall'utente**, e il posto dove si disfa è il popup. Vale
+   anche per ciò che l'utente crea di suo: i collegamenti manuali hanno un elenco e si
+   staccano da lì.
 4. **Lo stato del catalogo non si nasconde.** Un catalogo vecchio, parziale o bloccato dal login
    è la causa numero uno di risultati sbagliati: va detto, non mascherato.
 5. **Zero dipendenze, zero configurazione.** Ogni scelta di UI deve reggere senza build step.
