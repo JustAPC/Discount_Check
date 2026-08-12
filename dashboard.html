@@ -126,6 +126,16 @@
         letter-spacing: -0.015em;
         margin: 0;
       }
+      /* La version accanto al titolo: serve solo quando chiedi "che versione hai?",
+         quindi sta in grigio e non compete con niente. Diventa rossa se è vecchia. */
+      .ver {
+        font-size: 11px;
+        color: var(--ink-3);
+        letter-spacing: -0.01em;
+      }
+      .ver.old {
+        color: var(--err-ink);
+      }
       .hd-meta {
         margin-left: auto;
         font-size: 11px;
@@ -716,6 +726,7 @@
       <div class="hd-top">
         <span class="dot" id="dot"></span>
         <h1 id="title">Discount Check</h1>
+        <span class="ver" id="ver"></span>
         <span class="hd-meta" id="sub">leggo lo stato…</span>
       </div>
       <div class="bar" id="bar" hidden><i></i></div>

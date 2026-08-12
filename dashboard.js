@@ -392,6 +392,8 @@ function renderMuted() {
 
 function renderUpdate() {
   const u = S.update;
+  $('ver').textContent = 'v' + S.version;
+  $('ver').classList.toggle('old', !!u);
   $('upd').hidden = !u;
   if (!u) return;
   $('upd').href = u.url;
