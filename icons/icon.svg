@@ -1,0 +1,10 @@
+<!-- Sorgente dell'icona. I PNG accanto sono renderizzati da qui a 512 e ridotti.
+     Il segno di spunta è diviso in due: braccio corto verde = Corporate Benefits,
+     braccio lungo viola = Revolut, le due fonti che si sommano in una conferma sola. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="28" fill="#14161a"/>
+  <g fill="none" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M56 88 97 37" stroke="#c4b5fd"/>
+    <path d="M32 68 56 88" stroke="#34d399"/>
+  </g>
+</svg>
