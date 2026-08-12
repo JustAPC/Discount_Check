@@ -94,25 +94,6 @@ jobs:
           [Guida completa](https://justapc.github.io/Discount_Check/)
           EOF
 
-      # Avviso una tantum: la 1.0.9 introduce il campo "key" nel manifest e quindi
-      # cambia l'ID dell'estensione, che è ciò a cui il browser lega lo storage.
-      - if: steps.v.outputs.v == '1.0.9'
-        run: |
-          cat >> notes.md <<'EOF'
-
-          ---
-
-          ## ⚠️ Solo per questo aggiornamento
-
-          Da questa versione l'ID dell'estensione è fissato nel manifest e non dipende più dalla
-          cartella: da domani potrai spostarla senza perdere niente. Il passaggio però costa una
-          volta sola: il browser lega lo storage all'ID, che cambia adesso.
-
-          Dopo l'aggiornamento dovrai **reinserire le credenziali del portale** e premere **Aggiorna
-          tutto** per riscaricare il catalogo. Anche l'icona va rifissata nella barra, e se resta una
-          scheda vecchia di Discount Check nella pagina delle estensioni, rimuovila pure.
-          EOF
-
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |

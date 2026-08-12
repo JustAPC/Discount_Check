@@ -2,18 +2,10 @@
   "manifest_version": 3,
   "name": "Discount Check",
   "version": "1.0.9",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsFevoVoC8GlLg831gR4bqsL1ki/puJKcWyKVz1mo8Zvl6zqYo3zLFKpdWmivb/Ud1lWR+vIKh12O8r2jtsaiqYlHPDLXEmpoAeBQd9O5Qo/wR0I32B5rt8U4iuAX6a37ZHbS7cChKI4JBZeWYFMAC+Nu26TfbeMqBlsucJm0YksaRYULufKvm6EGltmQCMzWmNmG0Y266O8vfWd/lxK5k1FevvPwyMjPFOHm9Gfw7EL+jYIMmYIP2EDHGEZtsdIHXe2SYJEJ3C1XExpGJQ/FUgak6kCEQg1pCf/cqkmTJY0NCtOBR0ymsYcNsFTLJEP4tLPViMQp8V09yfWsEPG6zQIDAQAB",
   "description": "Ricorda sconti Corporate Benefits, punti Revolut e cashback Klarna mentre fai acquisti online.",
-  "permissions": [
-    "storage",
-    "alarms"
-  ],
-  "host_permissions": [
-    "<all_urls>"
-  ],
-  "background": {
-    "service_worker": "background.js"
-  },
+  "permissions": ["storage", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -32,13 +24,8 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "http://*/*",
-        "https://*/*"
-      ],
-      "js": [
-        "content.js"
-      ],
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
       "run_at": "document_idle",
       "all_frames": false
     }

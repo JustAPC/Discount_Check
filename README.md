@@ -49,9 +49,9 @@ dove sono.
 > scompattalo **sopra la cartella che usi già**, poi pagina delle estensioni → **Aggiorna**. Dalla
 > prossima volta ci pensa lo script.
 
-> ⚠️ **Non usare "Rimuovi" e poi ricaricare.** Quando rimuovi un'estensione il browser cancella anche
-> il suo `chrome.storage.local`: perdi credenziali, catalogo e segnalazioni. Spostare la cartella
-> invece si può, dalla 1.0.9 in poi: l'ID è fissato nel manifest e non dipende più dal percorso.
+> ⚠️ **Non usare "Rimuovi" e poi ricaricare.** Quando rimuovi un'estensione il browser cancella anche il
+> suo `chrome.storage.local`: perdi credenziali, catalogo e segnalazioni. Stessa cosa se sposti la
+> cartella: l'ID dell'estensione dipende dal percorso.
 
 ---
 
@@ -89,9 +89,8 @@ Scaricano e scompattano in `Documenti/discount-check`, poi aprono la cartella.
 2. attiva **Modalità sviluppatore** (in alto a destra)
 3. **Carica estensione non pacchettizzata** → seleziona `Documenti/discount-check`
 
-Il browser carica l'estensione **da quella cartella**, non ne fa una copia: se la cancelli
-l'estensione sparisce. Spostarla invece è sicuro — l'ID è fissato nel manifest — basta ricaricarla
-dalla nuova posizione.
+Il browser carica l'estensione **da quella cartella**, non ne fa una copia: non spostarla e non
+cancellarla.
 
 ### 3. Inserisci le credenziali del portale
 
@@ -248,8 +247,6 @@ uno sconto vale più che sapere che c'è un aggiornamento.
 - La classe `cbg3-discount-and-location--uppercase` contiene **sia lo sconto sia la distanza in KM**: si tiene il valore con `%`.
 - Il link firmato `/generic-link?link=…&sig=…` ha token a scadenza: si salva **solo il dominio**, mai il link.
 - ~50% delle offerte punta al dominio del brand, ~20% a portali convenzione dedicati (`convenzionipiaggio.com`, `iltuoticket.it`), ~10% al gift card shop `it.vouchers-at-work.com`, il resto sono negozi fisici senza link.
-- Il campo `key` nel manifest è la chiave pubblica che fissa l'**ID dell'estensione**: senza, l'ID di un'estensione non pacchettizzata deriva dal percorso della cartella, e spostarla equivale a reinstallarla da zero (storage perso). La chiave privata corrispondente vive fuori dal repo — serve solo se un giorno si vorrà pacchettizzare o pubblicare sullo Store. Introdurla ha avuto un costo una tantum: alla 1.0.9 l'ID è cambiato e tutti hanno dovuto reinserire le credenziali.
-- **Crea pacchetto** (il `.crx`) non serve: da Chrome 33 l'installazione di un `.crx` fuori dallo Store è bloccata su macOS e Windows, e l'auto-update via `update_url` vale solo per estensioni dello Store o gestite da policy. Da qui lo script di aggiornamento.
 - L'API Klarna **non è documentata**: è quella del sito. Se cambia forma, `klSync` va in errore e la lista in cache resta quella dell'ultima volta — le altre due fonti non se ne accorgono.
 - Klarna elenca lo stesso brand più volte con tassi diversi (`G-Star Raw` 4% e `G Star RAW` 2%): a parità di chiave si tiene il tasso migliore.
 
