@@ -5,10 +5,14 @@ Portale: `almaviva.convenzioniaziendali.it`.
 
 ## Installazione
 
-1. Chrome → `chrome://extensions` → attiva **Modalità sviluppatore**
-2. **Carica estensione non pacchettizzata** → seleziona questa cartella
-3. Fai login sul portale in una tab
+1. Copia `credentials.example.json` in `credentials.json` e scrivici email e password del portale
+2. Chrome → `chrome://extensions` → attiva **Modalità sviluppatore**
+3. **Carica estensione non pacchettizzata** → seleziona questa cartella
 4. Apri l'estensione → **Aggiorna tutto** (primo crawl: ~900 offerte, qualche minuto)
+
+`credentials.json` è gitignorato e non sta in `web_accessible_resources`: lo legge solo il service
+worker, nessuna pagina web può chiederlo. Resta comunque in chiaro sul disco — se modifichi il file,
+ricarica l'estensione.
 
 ## Come funziona
 
@@ -17,7 +21,7 @@ Portale: `almaviva.convenzioniaziendali.it`.
 - **Sync** automatica ogni 24h (`chrome.alarms`) di entrambe le fonti + **Aggiorna tutto** in
   dashboard; "Aggiorna Revolut" da solo evita il crawl lungo del portale quando serve solo il
   catalogo punti
-- Per Corporate Benefits nessuna credenziale salvata: il crawl riusa la sessione già attiva nel browser, tutto resta in `chrome.storage.local`
+- **Login automatico**: quando la sessione del portale scade, il service worker rifà il login da solo con `credentials.json` e riprende il crawl. Nessun intervento manuale, la sync giornaliera è autonoma. Tutto il resto sta in `chrome.storage.local`
 
 ## Seconda fonte: Revolut
 
@@ -43,8 +47,9 @@ funzionare offline.
 
 Tarato per **preferire i falsi positivi**. Quando sbaglia: "Non c'entra nulla" nel popup, oppure la sezione **Segnalazioni di errore** in dashboard (reversibile).
 
-### Login scaduto
-Il popup al checkout esce **comunque**, con l'avviso "Sessione scaduta". Il catalogo salvato resta valido per il match. Se il catalogo non è mai stato scaricato, al checkout appare un avviso generico max 1 volta al giorno.
+### Login fallito
+Se il re-login automatico non riesce (password cambiata, `credentials.json` mancante) la dashboard lo
+dice esplicitamente e il popup al checkout esce **comunque**, con l'avviso "Sessione scaduta". Il catalogo salvato resta valido per il match. Se il catalogo non è mai stato scaricato, al checkout appare un avviso generico max 1 volta al giorno.
 
 ## Struttura
 

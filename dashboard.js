@@ -56,8 +56,10 @@ async function refresh() {
 
   $('warn').innerHTML = '';
   if (st.state === 'login') {
-    warn('Sessione del portale scaduta',
-      'Fai login sul portale e premi "Aggiorna tutto". Il catalogo salvato resta attivo, ma può essere incompleto.');
+    warn(st.reason === 'nocreds' ? 'Credenziali mancanti' : 'Login al portale fallito',
+      st.reason === 'nocreds'
+        ? 'Crea credentials.json nella cartella dell\'estensione (vedi credentials.example.json) e ricarica l\'estensione.'
+        : 'Il portale ha rifiutato email o password in credentials.json. Il catalogo salvato resta attivo, ma può essere incompleto.');
   } else if (st.state === 'error') {
     warn('Sincronizzazione fallita', st.error || 'errore sconosciuto', 'err');
   }

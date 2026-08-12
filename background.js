@@ -41,14 +41,55 @@ async function resume() {
 // --- fetch dal portale -----------------------------------------------------
 
 class LoginError extends Error {
-  constructor() { super('login'); }
+  // reason: 'nocreds' (credentials.json assente/incompleto) | 'failed' (credenziali rifiutate)
+  constructor(reason) { super(reason); this.reason = reason; }
 }
 
-async function fetchText(path) {
+// Credenziali del portale: file nella cartella dell'estensione, fuori dal repo.
+// Non è in web_accessible_resources, quindi lo legge solo l'estensione.
+async function creds() {
+  try {
+    const r = await fetch(chrome.runtime.getURL('credentials.json'));
+    const c = await r.json();
+    return c && c.email && c.password ? c : null;
+  } catch { return null; }
+}
+
+// Il form del portale è POST /login con campi loginData[...], senza CSRF token.
+// Dopo il login riuscito la risposta è la home, che contiene /logout.
+async function doLogin() {
+  const c = await creds();
+  if (!c) return 'nocreds';
+  const r = await fetch(PORTAL + '/login', {
+    method: 'POST',
+    credentials: 'include',
+    redirect: 'follow',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      'loginData[email]': c.email,
+      'loginData[password]': c.password,
+      'cbg3-submit': 'Accedi'
+    })
+  });
+  return (await r.text()).includes('/logout') ? 'ok' : 'failed';
+}
+
+// Durante il crawl ci sono CONC fetch in volo: un solo login condiviso, non quattro.
+let loginP = null;
+function login() {
+  if (!loginP) loginP = doLogin().finally(() => { loginP = null; });
+  return loginP;
+}
+
+async function fetchText(path, retry = true) {
   const r = await fetch(PORTAL + path, { credentials: 'include', redirect: 'follow' });
   const t = await r.text();
   // Se la sessione è scaduta il portale serve la pagina di login: niente /logout.
-  if (!t.includes('/logout')) throw new LoginError();
+  if (!t.includes('/logout')) {
+    const res = retry ? await login() : 'failed';
+    if (res !== 'ok') throw new LoginError(res);
+    return fetchText(path, false);
+  }
   return t;
 }
 
@@ -147,6 +188,7 @@ async function fail(e) {
     sync: {
       ...st,
       state: e instanceof LoginError ? 'login' : 'error',
+      reason: e instanceof LoginError ? e.reason : null,
       error: e instanceof LoginError ? null : String(e && e.message || e)
     }
   });
