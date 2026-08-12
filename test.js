@@ -131,6 +131,26 @@ const negativi = ['amazon.it', 'ebay.it', 'subito.it', 'github.com', 'poste.it',
   'bershka.com', 'douglas.it', 'lidl.it', 'conad.it', 'fnac.it', 'vinted.it'];
 eq('match: nessun falso positivo', negativi.filter(h => m(h).length), []);
 
+// --- chiavi da un token: le collisioni viste in uso reale -------------------
+// Un token corto preso da un nome di due parole diventava una chiave a se' stante e
+// marcava domini che non c'entrano niente. Il badge ora si vede su ogni tab, quindi
+// questi falsi positivi non sono piu' invisibili fino al checkout.
+eq('nameKeys: token corto non fa chiave', [...T.nameKeys('Brave Soul')], ['bravesoul']);
+eq('nameKeys: nome di persona non fa chiave', [...T.nameKeys('Andrea Milano')], ['andreamilano']);
+// Ma un token lungo resta prezioso: e' come si aggancia mondadoristore.it.
+eq('nameKeys: token lungo resta',
+  [...T.nameKeys('Gruppo Editoriale Mondadori')].includes('mondadori'), true);
+// Brand di una parola sola: la chiave del nome intero e' gia' il token.
+eq('nameKeys: brand corto di una parola', [...T.nameKeys('LEGO® Gift Cards')], ['lego']);
+
+const collisioni = { 'bravesoul': ['31'], 'andreamilano': ['32'], 'mondadori': ['33'] };
+const cIdx = { dom: {}, name: collisioni };
+eq('match: brave.com non e\' Brave Soul', T.matchIds('search.brave.com', cIdx), []);
+eq('match: andreapontillo.tech non e\' Andrea Milano',
+  T.matchIds('ha.andreapontillo.tech', cIdx), []);
+eq('match: mondadoristore.it resta agganciato',
+  T.matchIds('www.mondadoristore.it', cIdx), ['33']);
+
 // --- collapsed: il portale è cambiato o il calo è vero? --------------------
 eq('collapsed: crollo da portale rotto', T.collapsed(12, 890, 0), true);
 eq('collapsed: crollo già visto, stavolta ci si crede', T.collapsed(12, 890, 1), false);

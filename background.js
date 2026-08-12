@@ -9,6 +9,7 @@ const KLARNA_PAGE = 100; // oltre 100 per pagina l'API risponde con zero negozi
 const CONC = 4; // fetch in parallelo durante il crawl
 const PARSE_V = 2; // versione di parseOffer: bumpala e la sync ri-scarica tutto
 const SAVE_EVERY = 10; // batch tra un salvataggio e l'altro
+const MIN_TOKEN = 7; // lunghezza minima di un token per valere da solo come chiave
 const COLLAPSE_MIN = 50; // sotto questa taglia un catalogo può dimezzarsi per motivi veri
 const SNOOZE_MS = 2 * 60 * 60 * 1000;
 const NUDGE_MS = 24 * 60 * 60 * 1000;
@@ -27,8 +28,16 @@ const set = (o) => chrome.storage.local.set(o);
 const watchQueue = () => chrome.alarms.create("resume", { periodInMinutes: 1 });
 const unwatchQueue = () => chrome.alarms.clear("resume");
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async () => {
   chrome.alarms.create("daily", { periodInMinutes: 1440, delayInMinutes: 1 });
+  // Gli indici sono derivati dai cataloghi con le regole di nameKeys, che cambiano da
+  // una versione all'altra: vanno rifatti subito dai cataloghi già in storage. Senza,
+  // una correzione al matching resterebbe invisibile per tutta la durata del crawl —
+  // minuti in cui il badge continua a dire quello che diceva prima.
+  const { catalog = { offers: {} } } = await get("catalog");
+  await rebuild(catalog);
+  await rebuildRev();
+  await rebuildKl();
   // Tutte e tre le fonti, non solo il portale: appena installata l'estensione deve
   // essere utile subito, senza aspettare l'alarm giornaliero o i bottoni singoli.
   sync();
@@ -399,9 +408,12 @@ function nameKeys(title) {
     .filter((w) => w && !NOISE.has(w));
   const keys = new Set();
   if (toks.length) keys.add(toks.join(""));
-  // Brand corti ("LEGO", "IKEA") solo se il titolo è già essenziale, altrimenti serve più lunghezza.
-  const min = toks.length <= 2 ? 4 : 6;
-  for (const w of toks) if (w.length >= min && !GENERIC.has(w)) keys.add(w);
+  // Un singolo token vale come chiave solo se è lungo abbastanza da essere un nome e non
+  // una parola. Sotto questa soglia produceva collisioni con domini che non c'entrano:
+  // "Brave Soul" dava la chiave "brave" e marcava brave.com, "Andrea Milano" dava
+  // "andrea" e marcava andreapontillo.tech. I brand di una parola sola sono già coperti
+  // dalla chiave del nome intero, che per loro è la stessa cosa.
+  for (const w of toks) if (w.length >= MIN_TOKEN && !GENERIC.has(w)) keys.add(w);
   return keys;
 }
 
