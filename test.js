@@ -12,7 +12,8 @@ const ctx = {
   console,
   URL, TextDecoder, fetch: () => Promise.resolve({ text: () => Promise.resolve('') }),
   chrome: {
-    runtime: { onInstalled: listener, onStartup: listener, onMessage: listener },
+    runtime: { onInstalled: listener, onStartup: listener, onMessage: listener,
+      getManifest: () => ({ version: '0.0.0' }) },
     alarms: { onAlarm: listener, create: noop, clear: noop },
     storage: {
       local: {
@@ -316,6 +317,26 @@ eq('storeIndex: alias ancora utile, tenuto',
   store.revBlocked = { 'zalando.it': ['zalando'] };
   const bloccato = await T.checkHost('www.zalando.it');
   eq('checkHost: falsi positivi segnalati', has(bloccato), 0);
+
+  // Il gesto "non c'entra nulla" scrive su tre mappe: l'undo deve saperle togliere
+  // tutte e tre, altrimenti Revolut e Klarna restavano nascoste per sempre.
+  store.klBlocked = { 'zalando.it': ['zalando'] };
+  await T.handle({ type: 'unreport', domain: 'zalando.it', id: '2' });
+  await T.handle({ type: 'revUnreport', domain: 'zalando.it', key: 'zalando' });
+  await T.handle({ type: 'klUnreport', domain: 'zalando.it', key: 'zalando' });
+  eq('unreport: le tre fonti tornano in circolo',
+    [store.blocked, store.revBlocked, store.klBlocked, has(await T.checkHost('www.zalando.it'))],
+    [{}, {}, {}, 2]);
+
+  // Lo snooze spegne la card ma non le righe: la dashboard le mostra lo stesso, con
+  // scritto fino a quando. E si toglie da li'.
+  await T.handle({ type: 'snooze', domain: 'zalando.it' });
+  const pausa = await T.checkHost('www.zalando.it');
+  eq('snooze: in pausa ma le righe restano', [pausa.snoozed, has(pausa)], [true, 2]);
+  eq('snooze: la dashboard sa fino a quando',
+    (await T.handle({ type: 'state' })).snooze['zalando.it'] > Date.now(), true);
+  await T.handle({ type: 'unsnooze', domain: 'zalando.it' });
+  eq('unsnooze: pausa tolta', (await T.checkHost('www.zalando.it')).snoozed, false);
 
   // --- collegamenti manuali: creare, e soprattutto togliere ------------------
   // Erano l'unica cosa che l'utente crea deliberatamente e l'unica senza un undo.

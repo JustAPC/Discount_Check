@@ -510,10 +510,31 @@
         width: 13px;
         height: 13px;
         color: var(--ink-3);
+      }
+      /* Solo la freccia gira: l'icona di sezione resta ferma. */
+      summary .chev {
         transition: transform var(--t);
       }
-      details[open] summary .ic {
+      details[open] summary .chev {
         transform: rotate(90deg);
+      }
+      /* L'icona di sezione è più grande della freccia e resta in grigio: il colore lo
+         portano le sigle dei cataloghi. */
+      summary .sic {
+        width: 15px;
+        height: 15px;
+        margin-right: -1px;
+        color: var(--ink-2);
+      }
+      /* Logo del servizio (favicon ufficiale, 64px, in icons/brands/). Due sono marchi scuri
+         su fondo trasparente: senza la piastrella bianca sparirebbero in tema scuro. */
+      .logo {
+        width: 16px;
+        height: 16px;
+        flex: none;
+        border-radius: 4px;
+        background: #fff;
+        object-fit: contain;
       }
       summary .n {
         margin-left: auto;
@@ -763,6 +784,17 @@
         <path d="M12 17h.01" />
       </symbol>
       <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></symbol>
+      <!-- Un'icona per sezione: i tre cataloghi hanno la sigla nel loro colore, le sezioni
+       di manutenzione un simbolo (catena, avviso, campanella sbarrata, chiave). -->
+      <symbol id="i-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 7.5V12l3 2" />
+      </symbol>
+      <symbol id="i-key" viewBox="0 0 24 24">
+        <circle cx="8" cy="8" r="4" />
+        <path d="m11 11 8 8" />
+        <path d="m16.5 16.5 2-2" />
+      </symbol>
     </svg>
 
     <header class="hd">
@@ -818,7 +850,7 @@
 
         <details id="d-cb">
           <summary>
-            <svg class="ic"><use href="#i-chevron" /></svg>Catalogo Corporate Benefits<span
+            <svg class="ic chev"><use href="#i-chevron" /></svg><img class="logo" src="icons/brands/corporate-benefits.png" alt="" width="16" height="16" />Catalogo Corporate Benefits<span
               class="n"
               id="n-cb"
             ></span>
@@ -828,7 +860,7 @@
 
         <details id="d-rev">
           <summary>
-            <svg class="ic"><use href="#i-chevron" /></svg>Catalogo Revolut<span class="n" id="n-rev"></span>
+            <svg class="ic chev"><use href="#i-chevron" /></svg><img class="logo" src="icons/brands/revolut.png" alt="" width="16" height="16" />Catalogo Revolut<span class="n" id="n-rev"></span>
           </summary>
           <div class="body">
             <div class="hd-actions" style="margin: 0 0 8px">
@@ -843,7 +875,7 @@
 
         <details id="d-kl">
           <summary>
-            <svg class="ic"><use href="#i-chevron" /></svg>Cashback Klarna<span class="n" id="n-kl"></span>
+            <svg class="ic chev"><use href="#i-chevron" /></svg><img class="logo" src="icons/brands/klarna.png" alt="" width="16" height="16" />Cashback Klarna<span class="n" id="n-kl"></span>
           </summary>
           <div class="body">
             <div class="hd-actions" style="margin: 0 0 8px">
@@ -858,7 +890,7 @@
 
         <details id="d-aliases">
           <summary>
-            <svg class="ic"><use href="#i-chevron" /></svg>Collegamenti manuali<span
+            <svg class="ic chev"><use href="#i-chevron" /></svg><svg class="ic sic"><use href="#i-link" /></svg>Collegamenti manuali<span
               class="n"
               id="n-aliases"
             ></span>
@@ -868,7 +900,7 @@
 
         <details id="d-blocked">
           <summary>
-            <svg class="ic"><use href="#i-chevron" /></svg>Segnalazioni di errore<span
+            <svg class="ic chev"><use href="#i-chevron" /></svg><svg class="ic sic"><use href="#i-alert" /></svg>Segnalazioni di errore<span
               class="n"
               id="n-blocked"
             ></span>
@@ -876,16 +908,26 @@
           <div class="body" id="blocked"></div>
         </details>
 
+        <details id="d-snoozed">
+          <summary>
+            <svg class="ic chev"><use href="#i-chevron" /></svg><svg class="ic sic"><use href="#i-clock" /></svg>Siti in pausa<span
+              class="n"
+              id="n-snoozed"
+            ></span>
+          </summary>
+          <div class="body" id="snoozed"></div>
+        </details>
+
         <details id="d-muted">
           <summary>
-            <svg class="ic"><use href="#i-chevron" /></svg>Siti silenziati<span class="n" id="n-muted"></span>
+            <svg class="ic chev"><use href="#i-chevron" /></svg><svg class="ic sic"><use href="#i-bell-off" /></svg>Siti silenziati<span class="n" id="n-muted"></span>
           </summary>
           <div class="body" id="muted"></div>
         </details>
 
         <details id="d-creds">
           <summary>
-            <svg class="ic"><use href="#i-chevron" /></svg>Accesso al portale<span
+            <svg class="ic chev"><use href="#i-chevron" /></svg><svg class="ic sic"><use href="#i-key" /></svg>Accesso al portale<span
               class="n"
               id="n-creds"
             ></span>

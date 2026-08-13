@@ -1050,6 +1050,7 @@ async function handle(msg) {
       "sync",
       "blocked",
       "muted",
+      "snooze",
       "aliases",
       "revAliases",
       "klAliases",
@@ -1072,6 +1073,11 @@ async function handle(msg) {
       giftcards: Object.values(offers).filter((o) => o.k === "giftcard").length,
       blocked: st.blocked || {},
       muted: st.muted || [],
+      // Le pause scadute restano scritte finche' non si ripassa sul sito: qui non
+      // vanno mostrate, quindi si filtrano subito invece di far finta in dashboard.
+      snooze: Object.fromEntries(
+        Object.entries(st.snooze || {}).filter(([, until]) => until > Date.now()),
+      ),
       aliases: st.aliases || {},
       revAliases: st.revAliases || {},
       klAliases: st.klAliases || {},

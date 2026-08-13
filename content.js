@@ -237,6 +237,10 @@
       /* "fino a 1,5%" non sta in 76px: al chip Klarna serve più corda. */
       .pct.kl { color:var(--kl-ink); background:var(--kl-bg); max-width:96px; }
       .pct.none { color:var(--ink-3); background:var(--raise); }
+      /* Il logo dice da dove viene la riga prima ancora di leggere il chip. Due marchi su
+         tre sono scuri e trasparenti: senza la piastrella bianca sparirebbero al buio. */
+      .logo { width:24px; height:24px; flex:none; border-radius:6px; background:#fff;
+        object-fit:contain; margin-right:-3px; }
       .box { flex:1; min-width:0; }
       .t { font-weight:550; font-size:12.5px; }
       .k { font-size:11px; color:var(--ink-2); }
@@ -268,6 +272,16 @@
       s.appendChild(p);
     }
     return s;
+  }
+
+  // Il logo del servizio, dalla cartella dell'estensione: è in web_accessible_resources,
+  // quindi la pagina ospite può caricarlo senza chiedere niente a nessuno.
+  function logo(name) {
+    const i = document.createElement("img");
+    i.className = "logo";
+    i.src = chrome.runtime.getURL(`icons/brands/${name}.png`);
+    i.alt = "";
+    return i;
   }
 
   function warnBox(title, text) {
@@ -336,7 +350,7 @@
     k.className = "k";
     k.textContent = note;
     box.append(t, k);
-    row.append(pct, box);
+    row.append(logo(cls === "kl" ? "klarna" : "revolut"), pct, box);
     return row;
   }
 
@@ -411,7 +425,7 @@
       go.className = "go";
       go.append(icon("external"), state.needLogin ? "Login" : "Apri");
       go.onclick = () => send({ type: "open", id: o.id, cat: o.c });
-      row.append(pct, box, go);
+      row.append(logo("corporate-benefits"), pct, box, go);
       c.appendChild(row);
     }
 

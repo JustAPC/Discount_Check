@@ -108,13 +108,15 @@ async function refresh() {
   $('s-rev').textContent = rev.length;
   $('s-kl').textContent = kl.length;
 
-  const blocked = Object.entries(S.blocked).flatMap(([d, ids]) => ids.map(id => [d, id]));
+  const blocked = blockedRows();
+  const snoozed = snoozeRows();
   const aliases = aliasRows();
   $('n-aliases').textContent = aliases.length;
   $('n-cb').textContent = S.count;
   $('n-rev').textContent = rev.length;
   $('n-kl').textContent = kl.length;
   $('n-blocked').textContent = blocked.length;
+  $('n-snoozed').textContent = snoozed.length;
   $('n-muted').textContent = S.muted.length;
   renderCreds();
   $('ver').textContent = 'v' + S.version;
@@ -127,6 +129,7 @@ async function refresh() {
   renderKlarna(kl);
   renderAliases(aliases);
   renderBlocked(blocked);
+  renderSnoozed(snoozed);
   renderMuted();
   search();
 
@@ -544,6 +547,41 @@ function aliasRows() {
   return rows.sort((a, b) => a.d.localeCompare(b.d));
 }
 
+// "Non c'entra nulla" nasconde la riga in tutte e tre le fonti, quindi anche l'elenco
+// da cui si disfa deve tenerle tutte: prima ce n'era solo una e le altre due restavano
+// nascoste per sempre, senza un gesto per rimetterle in circolo.
+function blockedRows() {
+  const nameOf = (list, k) => (list.find(o => o.name_key === k) || {}).name;
+  const rev = (S.revolut || {}).offers || [];
+  const kl = (S.klarna || {}).offers || [];
+  const rows = [];
+  for (const [d, ids] of Object.entries(S.blocked || {})) {
+    for (const id of ids) {
+      rows.push({ d, src: 'Corporate Benefits', label: (S.offers[id] || {}).t,
+        undo: { type: 'unreport', domain: d, id } });
+    }
+  }
+  for (const [d, keys] of Object.entries(S.revBlocked || {})) {
+    for (const k of keys) {
+      rows.push({ d, src: 'Revolut', label: nameOf(rev, k),
+        undo: { type: 'revUnreport', domain: d, key: k } });
+    }
+  }
+  for (const [d, keys] of Object.entries(S.klBlocked || {})) {
+    for (const k of keys) {
+      rows.push({ d, src: 'Klarna', label: nameOf(kl, k),
+        undo: { type: 'klUnreport', domain: d, key: k } });
+    }
+  }
+  return rows.sort((a, b) => a.d.localeCompare(b.d));
+}
+
+function snoozeRows() {
+  return Object.entries(S.snooze || {})
+    .map(([d, until]) => ({ d, until }))
+    .sort((a, b) => a.until - b.until);
+}
+
 function renderAliases(rows) {
   const box = $('aliases');
   box.innerHTML = '';
@@ -566,24 +604,46 @@ function renderAliases(rows) {
   }
 }
 
-function renderBlocked(pairs) {
+function renderBlocked(rows) {
   const box = $('blocked');
   box.innerHTML = '';
-  if (!pairs.length) {
+  if (!rows.length) {
     const e = el('div', 'empty');
     e.append(el('b', null, 'Nessun falso positivo segnalato'),
       'Quando dal popup di un sito premi "Non c\'entra nulla", l\'offerta finisce qui. Da qui la rimetti in circolo.');
     box.appendChild(e);
     return;
   }
-  for (const [d, id] of pairs) {
-    const o = S.offers[id];
+  for (const r of rows) {
     const row = el('div', 'item');
     const t = el('div', 't');
-    t.append(el('b', null, o ? o.t : '(offerta non più in catalogo)'),
-      el('div', 'm', 'nascosta su ' + d));
+    t.append(el('b', null, r.label || '(non più in catalogo)'),
+      el('div', 'm', `${r.src} · nascosta su ${r.d}`));
     row.append(t, act('undo', 'Rimostra su questo sito',
-      async () => { await send({ type: 'unreport', domain: d, id }); refresh(); }));
+      async () => { await send(r.undo); refresh(); }));
+    box.appendChild(row);
+  }
+}
+
+// Lo snooze scade da solo dopo due ore: qui si legge fino a quando, e si toglie prima.
+function renderSnoozed(rows) {
+  const box = $('snoozed');
+  box.innerHTML = '';
+  if (!rows.length) {
+    const e = el('div', 'empty');
+    e.append(el('b', null, 'Nessun sito in pausa'),
+      '"Ricordamelo dopo" nel popup mette il dominio qui per due ore: il badge resta acceso, ' +
+      'ma al checkout non esce niente. Da qui riprendi subito.');
+    box.appendChild(e);
+    return;
+  }
+  for (const r of rows) {
+    const row = el('div', 'item');
+    const t = el('div', 't');
+    t.append(el('b', null, r.d), el('div', 'm', 'fino alle ' +
+      new Date(r.until).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })));
+    row.append(t, act('undo', 'Riprendi gli avvisi qui',
+      async () => { await send({ type: 'unsnooze', domain: r.d }); refresh(); }));
     box.appendChild(row);
   }
 }
