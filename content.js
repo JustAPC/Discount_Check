@@ -7,10 +7,18 @@
   if (window.__discountCheck) return;
   window.__discountCheck = true;
 
-  const CHECKOUT_URL =
-    /(checkout|\/cart|carrello|basket|panier|kasse|pagamento|payment|\/order|ordine|riepilogo)/i;
+  // Solo il path, mai la query. Nella query queste parole non dicono dove sei: su ogni
+  // sito di hotel "checkout" è il nome del parametro data di partenza — booking.com passa
+  // checkout=2026-08-16 sui risultati di ricerca — e "basket_id" compare in mezzo mondo.
+  // Il confine [^a-z] serve a non prendere /cartoleria con "cart" né /ordermanager con
+  // "order": la parola dev'essere un pezzo di percorso, non una sillaba dentro un'altra.
+  const CHECKOUT_PATH =
+    /(^|[^a-z])(checkout|carts?|carrello|basket|panier|kasse|pagament[oi]|payments?|orders?|ordin[ei]|riepilogo)([^a-z]|$)/i;
+  // Il testo del bottone è il segnale più forte, ed è l'unico che regge dove il percorso
+  // non dice niente (secure.booking.com/book.html). Le formule di prenotazione ci sono
+  // perché mezzo catalogo è viaggi: voli, traghetti, hotel, tour.
   const CHECKOUT_TEXT =
-    /(procedi al pagamento|vai alla cassa|completa l.ordine|conferma (e paga|ordine)|concludi l.ordine|paga ora|acquista ora|proceed to checkout|place order|complete order|pay now)/i;
+    /(procedi (al pagamento|all.ordine)|vai (alla cassa|al pagamento)|completa (l.ordine|l.acquisto|la prenotazione)|conferma (e paga|l.ordine|ordine|la prenotazione)|concludi (l.ordine|l.acquisto)|paga ora|acquista ora|proceed to checkout|place order|complete (order|purchase|booking)|confirm (booking|and pay)|pay now)/i;
 
   let state = null; // risposta del background per questo dominio
   let shown = false;
@@ -41,7 +49,7 @@
   // --- rilevamento checkout ------------------------------------------------
 
   function isCheckout() {
-    if (CHECKOUT_URL.test(location.pathname + location.search)) return true;
+    if (CHECKOUT_PATH.test(location.pathname)) return true;
     const els = document.querySelectorAll(
       'button, a[role="button"], input[type="submit"], [class*="checkout" i]',
     );

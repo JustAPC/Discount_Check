@@ -165,6 +165,42 @@ eq('match: mondadoristore.it resta agganciato',
 eq('match: ita-airways non e\' Qatar Airways', T.matchIds('www.ita-airways.com', cIdx), ['35']);
 eq('match: qatarairways non e\' ITA Airways', T.matchIds('www.qatarairways.com', cIdx), ['34']);
 
+// --- rilevamento del checkout ----------------------------------------------
+// Le regex si estraggono da content.js invece di ricopiarle qui: un test su una copia
+// non protegge il file che viene davvero spedito.
+const csrc = fs.readFileSync(path.join(__dirname, 'content.js'), 'utf8');
+const pick = n => {
+  const m = new RegExp('const ' + n + ' =\\s*(/.*?/i);', 's').exec(csrc);
+  if (!m) { fail++; console.log(`FAIL non trovo ${n} in content.js`); return /$^/; }
+  return eval(m[1]);
+};
+const C_PATH = pick('CHECKOUT_PATH'), C_TEXT = pick('CHECKOUT_TEXT');
+const pathOf = u => new URL(u).pathname;
+
+// I due URL veri di booking. Prima il primo matchava su "checkout=2026-08-16", che su
+// ogni sito di hotel e' la data di partenza, e il secondo solo per via di "basket_id".
+eq('checkout: i risultati di ricerca non sono un carrello',
+  C_PATH.test(pathOf('https://www.booking.com/searchresults.it.html?checkin=2026-08-13&checkout=2026-08-16&ss=Roma')),
+  false);
+eq('checkout: nessun falso positivo dalla query',
+  ['/hotel/it/cernaia-suites.it.html', '/searchresults.it.html', '/flights/index.it.html',
+   '/cartoleria/quaderni', '/ordermanagement/faq', '/books/12345'].filter(p => C_PATH.test(p)),
+  []);
+eq('checkout: i percorsi veri passano',
+  ['/checkout', '/it/carrello', '/cart/', '/panier', '/kasse', '/order/review',
+   '/ordini/nuovo', '/payment-methods', '/riepilogo-ordine'].filter(p => !C_PATH.test(p)),
+  []);
+// Su secure.booking.com/book.html il percorso non dice niente: decide il bottone.
+eq('checkout: il percorso di booking non basta', C_PATH.test('/book.html'), false);
+eq('checkout: lo prende il testo del bottone',
+  ['Completa la prenotazione', 'Conferma la prenotazione', 'Procedi al pagamento',
+   'Complete booking', 'Paga ora'].filter(t => !C_TEXT.test(t)),
+  []);
+eq('checkout: il testo non prende una pagina qualunque',
+  ['Cerca', 'Vedi disponibilità', 'Mostra i prezzi', 'Prenota', 'Aggiungi al carrello']
+    .filter(t => C_TEXT.test(t)),
+  []);
+
 // --- collapsed: il portale è cambiato o il calo è vero? --------------------
 eq('collapsed: crollo da portale rotto', T.collapsed(12, 890, 0), true);
 eq('collapsed: crollo già visto, stavolta ci si crede', T.collapsed(12, 890, 1), false);

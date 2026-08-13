@@ -68,8 +68,10 @@ Da qui in poi non devi fare più nulla: il catalogo si aggiorna da solo ogni 24 
 Non si usa: si fa vedere lei.
 
 - **Badge sull'icona** appena apri un sito convenzionato — sai subito che c'è qualcosa da guardare
-- **Popup al checkout** (URL tipo `/cart`, `/checkout`, `/carrello`, o bottoni "procedi al
-  pagamento", "completa l'ordine"), con le convenzioni che valgono per quel sito
+- **Popup al checkout** — riconosciuto dal **percorso** (`/cart`, `/checkout`, `/carrello`,
+  `/ordine`…) o dal testo di un bottone ("procedi al pagamento", "completa la prenotazione").
+  Il percorso e non la query: `checkout` nella query e' il nome standard del parametro data
+  di partenza sui siti di hotel, e prendeva i risultati di ricerca per un carrello
 - **Il sito su cui sei, in cima alla dashboard**: le stesse righe della card, raggiungibili sempre.
   Il badge dice che c'è qualcosa, questo dice *che cosa* — e da qui togli un abbinamento sbagliato
   senza dover arrivare a un checkout
