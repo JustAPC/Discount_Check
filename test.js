@@ -175,6 +175,12 @@ const pick = n => {
   return eval(m[1]);
 };
 const C_PATH = pick('CHECKOUT_PATH'), C_TEXT = pick('CHECKOUT_TEXT');
+const F_ADDR = pick('FILL_ADDR'), F_WHO = pick('FILL_WHO');
+// Stessa regola di looksLikePurchaseForm: almeno un token di indirizzo e tre in tutto.
+const modulo = tok => {
+  const seen = new Set(tok.filter(t => F_ADDR.test(t) || F_WHO.test(t)));
+  return [...seen].filter(t => F_ADDR.test(t)).length >= 1 && seen.size >= 3;
+};
 const pathOf = u => new URL(u).pathname;
 
 // I due URL veri di booking. Prima il primo matchava su "checkout=2026-08-16", che su
@@ -190,8 +196,22 @@ eq('checkout: i percorsi veri passano',
   ['/checkout', '/it/carrello', '/cart/', '/panier', '/kasse', '/order/review',
    '/ordini/nuovo', '/payment-methods', '/riepilogo-ordine'].filter(p => !C_PATH.test(p)),
   []);
-// Su secure.booking.com/book.html il percorso non dice niente: decide il bottone.
+// --- i due checkout veri, con i token letti davvero dalle pagine -------------
+// booking: nessun campo carta, nessuna parola utile nel percorso, ma sette token di
+// autofill. aliexpress: nessun input, ma "confirm" nel percorso.
 eq('checkout: il percorso di booking non basta', C_PATH.test('/book.html'), false);
+eq('checkout: booking lo prende il modulo di spedizione',
+  modulo(['given-name', 'family-name', 'email', 'address-line1', 'address-level2',
+          'postal-code', 'tel-national']), true);
+eq('checkout: aliexpress lo prende il percorso',
+  C_PATH.test('/p/trade/confirm.html'), true);
+eq('checkout: aliexpress non ha moduli', modulo([]), false);
+// Una registrazione ha nome, email e telefono ma nessun indirizzo: non e' un acquisto.
+eq('checkout: la registrazione non e\' un acquisto',
+  modulo(['given-name', 'family-name', 'email', 'tel']), false);
+eq('checkout: la newsletter nemmeno', modulo(['email']), false);
+// Amazon mette il checkout sotto /gp/buy/
+eq('checkout: amazon', C_PATH.test('/gp/buy/spc/handlers/display.html'), true);
 eq('checkout: lo prende il testo del bottone',
   ['Completa la prenotazione', 'Conferma la prenotazione', 'Procedi al pagamento',
    'Complete booking', 'Paga ora'].filter(t => !C_TEXT.test(t)),

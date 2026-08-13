@@ -12,8 +12,12 @@
   // checkout=2026-08-16 sui risultati di ricerca — e "basket_id" compare in mezzo mondo.
   // Il confine [^a-z] serve a non prendere /cartoleria con "cart" né /ordermanager con
   // "order": la parola dev'essere un pezzo di percorso, non una sillaba dentro un'altra.
+  // I percorsi sono in inglese anche sui siti tradotti — booking.com serve
+  // /book.html e aliexpress /p/trade/confirm.html mentre l'interfaccia parla italiano —
+  // quindi le parole inglesi sono quelle che reggono, e le altre lingue sono un di più
+  // per i siti che traducono anche l'URL.
   const CHECKOUT_PATH =
-    /(^|[^a-z])(checkout|carts?|carrello|basket|panier|kasse|pagament[oi]|payments?|orders?|ordin[ei]|riepilogo)([^a-z]|$)/i;
+    /(^|[^a-z])(checkout|carts?|basket|confirm|buy|pay|payments?|orders?|carrello|panier|kasse|pagament[oi]|ordin[ei]|riepilogo)([^a-z]|$)/i;
   // Il testo del bottone è il segnale più forte, ed è l'unico che regge dove il percorso
   // non dice niente (secure.booking.com/book.html). Le formule di prenotazione ci sono
   // perché mezzo catalogo è viaggi: voli, traghetti, hotel, tour.
@@ -48,8 +52,46 @@
 
   // --- rilevamento checkout ------------------------------------------------
 
+  // Un campo "numero carta" esiste solo dove si paga, e si riconosce senza leggere una
+  // parola: autocomplete="cc-number" è lo standard che i browser usano per il riempimento
+  // automatico, quindi lo mette chiunque voglia che la compilazione funzioni. È l'unico
+  // segnale che non dipende dalla lingua del sito — e la lingua non è un dettaglio: su
+  // booking.com il percorso cambia perfino con il paese dell'albergo.
+  //
+  // Vale solo in positivo: molti checkout tengono la carta dentro un iframe del gestore
+  // di pagamento e qui non si vede niente. Per quelli restano il percorso e il bottone.
+  // Gli iframe non li guardo apposta: i widget "paga in 3 rate" di Klarna e PayPal stanno
+  // anche sulle schede prodotto, e direbbero "checkout" dove si sta ancora guardando.
+  // Un modulo dove scrivi chi sei e dove abiti sta alla fine di un acquisto, non davanti
+  // a una vetrina. I token di `autocomplete` sono lo standard che i browser usano per il
+  // riempimento automatico, quindi li mette chiunque voglia che l'autofill funzioni: sono
+  // gli stessi in italiano, in spagnolo e in cinese. Su booking.com/book.html ce ne sono
+  // sette e nel percorso non c'è una parola utile.
+  //
+  // Serve almeno un token di **indirizzo** vero: una registrazione ha nome, email e
+  // telefono, ma il CAP lo chiede solo chi ti deve spedire qualcosa o fatturare.
+  const FILL_ADDR = /^(address-line[123]|address-level[1234]|postal-code|country(-name)?)$/i;
+  const FILL_WHO = /^(given-name|family-name|name|email|organization|tel([-a-z]*)?)$/i;
+  const MIN_ADDR = 1;
+  const MIN_FILL = 3;
+
+  const fillTokens = () =>
+    [...document.querySelectorAll("input[autocomplete]")].map((i) =>
+      (i.getAttribute("autocomplete") || "").trim(),
+    );
+
+  const looksLikePurchaseForm = (tok) => {
+    const seen = new Set(tok.filter((t) => FILL_ADDR.test(t) || FILL_WHO.test(t)));
+    return [...seen].filter((t) => FILL_ADDR.test(t)).length >= MIN_ADDR && seen.size >= MIN_FILL;
+  };
+
+  // Un campo "numero carta" c'è solo dove si paga, e non ha lingua. Vale solo in positivo:
+  // molti checkout tengono la carta dentro un iframe del gestore e qui non si vede niente.
+  const hasCardField = () => fillTokens().some((t) => /^cc-/i.test(t));
+
   function isCheckout() {
     if (CHECKOUT_PATH.test(location.pathname)) return true;
+    if (hasCardField() || looksLikePurchaseForm(fillTokens())) return true;
     const els = document.querySelectorAll(
       'button, a[role="button"], input[type="submit"], [class*="checkout" i]',
     );

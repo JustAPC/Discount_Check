@@ -357,28 +357,47 @@
       }
 
       /* --- statistiche -------------------------------------------------------- */
+      /* Stessi colori dei chip percentuale delle righe: un badge per catalogo. */
+      .stats-title {
+        margin: 0;
+        padding: 15px 2px 0;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+      }
       .stats {
         display: flex;
         align-items: center;
-        gap: 9px;
-        padding: 15px 2px 5px;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px 2px 5px;
+      }
+      .stats span {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 5px;
         font-size: 11px;
-        color: var(--ink-2);
+        font-weight: 650;
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+        color: var(--cb-ink);
+        background: var(--cb-bg);
+        border-radius: 6px;
+        padding: 4px 8px;
       }
       .stats b {
-        font-weight: 600;
+        font-weight: 700;
         font-size: 12.5px;
-        color: var(--cb-ink);
       }
-      .stats i {
-        font-style: normal;
-        color: var(--ink-3);
-      }
-      .stats .s-rev b {
+      .stats .s-rev {
         color: var(--rev-ink);
+        background: var(--rev-bg);
       }
-      .stats .s-kl b {
+      .stats .s-kl {
         color: var(--kl-ink);
+        background: var(--kl-bg);
       }
 
       /* --- gruppi ------------------------------------------------------------- */
@@ -790,11 +809,10 @@
       <section id="results" hidden></section>
 
       <div id="browse">
-        <div class="stats">
+        <h2 class="stats-title" id="stats-title">Numero offerte</h2>
+        <div class="stats" aria-labelledby="stats-title">
           <span><b id="s-count">–</b> Almaviva</span>
-          <i>·</i>
           <span class="s-rev"><b id="s-rev">–</b> Revolut</span>
-          <i>·</i>
           <span class="s-kl"><b id="s-kl">–</b> Klarna</span>
         </div>
 
