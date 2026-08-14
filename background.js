@@ -7,7 +7,7 @@ const REVOLUT_API = "https://sconti-api.andreapontillo.tech";
 const KLARNA_API = "https://www.klarna.com/it/api/store-edge-rest/public/stores/directory/search/IT";
 const KLARNA_PAGE = 100; // oltre 100 per pagina l'API risponde con zero negozi
 const CONC = 4; // fetch in parallelo durante il crawl
-const PARSE_V = 2; // versione di parseOffer: bumpala e la sync ri-scarica tutto
+const PARSE_V = 3; // versione di parseOffer: bumpala e la sync ri-scarica tutto
 const SAVE_EVERY = 10; // batch tra un salvataggio e l'altro
 const MIN_TOKEN = 7; // lunghezza minima di un token per valere da solo come chiave
 const COLLAPSE_MIN = 50; // sotto questa taglia un catalogo può dimezzarsi per motivi veri
@@ -16,6 +16,12 @@ const NUDGE_MS = 24 * 60 * 60 * 1000;
 
 const AFFILIATE = /(tradetracker|awin|zanox|webgains|affilinet|tradedoubler|daisycon|belboon|effiliation)\./;
 const VOUCHER_SHOP = /vouchers-at-work\.com$/;
+
+// Link che stanno sulla scheda ma non sono il negozio: la mappa del punto vendita, la
+// pagina social, il numero WhatsApp. Presi per buoni diventano il dominio dell'offerta,
+// e cinque convenzioni di mobili e hotel finiscono per comparire su google.com.
+const NOT_SHOP =
+  /(^|\.)(google\.[a-z.]+|goo\.gl|facebook\.com|instagram\.com|youtube\.com|youtu\.be|linkedin\.com|twitter\.com|x\.com|wa\.me|t\.me)$/;
 
 const get = (k) => chrome.storage.local.get(k);
 const set = (o) => chrome.storage.local.set(o);
@@ -366,6 +372,9 @@ function parseOffer(html, path, homeTitle) {
       }
     }
     if (/convenzioniaziendali\.it$/.test(u.hostname)) continue;
+    // Non è un break: la mappa sta spesso prima del link al sito, e scartandola
+    // soltanto qui il negozio vero, se c'è, resta raggiungibile dal giro dopo.
+    if (NOT_SHOP.test(u.hostname)) continue;
     host = u.hostname.replace(/^www\./, "");
     kind = VOUCHER_SHOP.test(host) ? "giftcard" : AFFILIATE.test(host) ? "affiliate" : "shop";
     break;

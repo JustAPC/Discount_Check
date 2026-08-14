@@ -48,7 +48,7 @@ const html = `
 <button data-href="https&#x3A;&#x2F;&#x2F;partners.rentalcar.com&#x2F;it&#x3F;a&#x3D;1&amp;b&#x3D;2">Shop online</button>`;
 eq('parseOffer HTML-encoded + KM',
   T.parseOffer(html, '/offer/123/cat/45'),
-  { id: '123', v: { c: '45', t: 'Alamo Autonoleggio', d: '< 20% Sconto', h: 'partners.rentalcar.com', k: 'shop', p: 2 } });
+  { id: '123', v: { c: '45', t: 'Alamo Autonoleggio', d: '< 20% Sconto', h: 'partners.rentalcar.com', k: 'shop', p: 3 } });
 
 // 4) il portale risponde con la home invece della scheda: va scartata, non salvata
 const HOME = 'I tuoi AlmavivA s.p.a. offerte per dipendenti';
@@ -66,6 +66,18 @@ eq('parseOffer affiliate', T.parseOffer(aff, '/offer/1/cat/2').v.k, 'affiliate')
 
 const local = `<h1>Ottica Artioli</h1><span class="cbg3-discount-and-location--uppercase">ca. 3.1 KM</span>`;
 eq('parseOffer negozio fisico', T.parseOffer(local, '/offer/1/cat/2').v.k, 'none');
+
+// 5) la mappa del punto vendita non è il sito del negozio: presa per buona, l'offerta
+// finisce indicizzata su google.com e compare su ogni ricerca.
+const maps = `<h1>Foscarini</h1><span class="cbg3-discount-and-location--uppercase">15% Sconto</span>
+<button data-href="https://www.google.com/maps?q=Foscarini">Mappa</button>`;
+eq('parseOffer scarta la mappa', T.parseOffer(maps, '/offer/1/cat/2').v.h, '');
+eq('parseOffer scarta la mappa: kind', T.parseOffer(maps, '/offer/1/cat/2').v.k, 'none');
+
+const mapsThenShop = `<h1>Novamobili</h1><span class="cbg3-discount-and-location--uppercase">30% Sconto</span>
+<button data-href="https://maps.google.com/?cid=1">Mappa</button>
+<button data-href="https://www.novamobili.it/">Shop online</button>`;
+eq('parseOffer dopo la mappa trova il sito', T.parseOffer(mapsThenShop, '/offer/1/cat/2').v.h, 'novamobili.it');
 
 // --- etld1 -----------------------------------------------------------------
 eq('etld1 www', T.etld1('www.thespacecinema.it'), 'thespacecinema.it');
