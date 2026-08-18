@@ -1,7 +1,7 @@
 // Discount Check - service worker: crawl del portale, indici, matching.
 const PORTAL = "https://almaviva.convenzioniaziendali.it";
 // Catalogo Revolut, servito da sconti-api. Sola lettura e nessun segreto: sta qui.
-const REVOLUT_API = "https://sconti-api.andreapontillo.tech";
+const REVOLUT_API = "https://sconti-api.andreapontillo.it";
 // Catalogo Klarna: è la stessa API JSON che alimenta klarna.com/it/store, pubblica e
 // senza chiave. Niente crawl e niente server di mezzo: la chiama il service worker.
 const KLARNA_API = "https://www.klarna.com/it/api/store-edge-rest/public/stores/directory/search/IT";
