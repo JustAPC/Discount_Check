@@ -1,13 +1,14 @@
 name: build
 
-# Da quando l'estensione sta sul Chrome Web Store, distribuire non è più compito di
-# questo workflow: gli aggiornamenti li spinge il browser. Qui resta il pacchetto da
-# caricare sullo Store e, soprattutto, i test — che sono il motivo per cui il workflow
-# continua a esistere.
+# Il workflow verifica, impacchetta e archivia l'estensione. Quando la versione del
+# manifest non ha ancora una GitHub Release, pubblica anche quella con lo ZIP allegato.
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   zip:
@@ -20,7 +21,18 @@ jobs:
       - run: node test.js
 
       - id: v
-        run: echo "v=$(jq -r .version manifest.json)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(jq -r .version manifest.json)"
+          tag="v${version}"
+          echo "v=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            echo "release_needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_needed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       # Nello zip va solo ciò che Chrome carica: niente server, skill, test, docs.
       # Lo Store rifiuta i pacchetti con file di troppo, e comunque non c'è motivo di
@@ -31,10 +43,20 @@ jobs:
             -x '.git/*' '.github/*' '.claude/*' 'dist/*' 'server/*' 'hermes-skill/*' \
                '.impeccable/*' '*.md' 'test.js' '.gitignore' '.prettierrc*' 'store/*' '*.DS_Store'
 
-      # Da scaricare qui e caricare sul Developer Dashboard dello Store. Non è una
-      # GitHub Release: nessuno deve più installare a mano da un link.
+      # Artifact da caricare anche sul Developer Dashboard dello Store.
       - uses: actions/upload-artifact@v4
         with:
           name: discount-check-${{ steps.v.outputs.v }}
           path: dist/discount-check.zip
           if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: steps.v.outputs.release_needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.v.outputs.tag }}" \
+            --target "$GITHUB_SHA" \
+            --title "Discount Check ${{ steps.v.outputs.tag }}" \
+            --generate-notes \
+            dist/discount-check.zip
