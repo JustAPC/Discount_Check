@@ -6,7 +6,7 @@
   "permissions": ["storage", "alarms", "scripting"],
   "host_permissions": [
     "https://*.convenzioniaziendali.it/*",
-    "https://sconti-api.andreapontillo.tech/*",
+    "https://sconti-api.andreapontillo.it/*",
     "https://www.klarna.com/*"
   ],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
