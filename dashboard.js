@@ -671,11 +671,17 @@ function renderMuted() {
 // significa "non toccarla". Si riscrive solo per cambiarla.
 
 function renderCreds() {
-  const c = S.creds || { email: '', saved: false };
-  $('n-creds').textContent = c.saved ? 'salvate' : 'da inserire';
+  const c = S.creds || { email: '', saved: false, verified: false, error: '' };
+  const status = $('n-creds');
+  status.textContent = c.verified ? '✓' : '×';
+  status.title = c.verified ? 'Collegato e verificato' : 'Non collegato o non verificato';
+  status.setAttribute('aria-label', status.title);
+  status.className = 'n ' + (c.verified ? 'ok' : 'bad');
   if (document.activeElement !== $('cred-email')) $('cred-email').value = c.email;
   $('cred-pass').placeholder = c.saved ? '•••••••• (salvata)' : 'password';
   $('cred-clear').disabled = !c.saved && !c.email;
+  $('cred-msg').textContent = c.error || (c.verified ? 'collegate e verificate' : '');
+  $('cred-msg').className = 'hd-meta' + (c.error ? ' err-text' : '');
 }
 
 // --- eventi -------------------------------------------------------------------
@@ -706,13 +712,17 @@ $('kl-sync').onclick = async () => {
 $('d-cb').addEventListener('toggle', () => { if ($('d-cb').open && live) renderCatalog(); });
 
 $('cred-save').onclick = async () => {
+  const button = $('cred-save');
+  button.disabled = true;
   const r = await send({
     type: 'setCreds',
     email: $('cred-email').value,
     password: $('cred-pass').value
   });
-  $('cred-msg').textContent = !r ? 'estensione non raggiungibile' : r.error || 'salvate';
+  $('cred-msg').textContent = !r ? 'estensione non raggiungibile' : r.error || 'collegate e verificate';
+  $('cred-msg').className = 'hd-meta' + (r && r.error ? ' err-text' : '');
   if (r && r.ok) $('cred-pass').value = '';
+  button.disabled = false;
   refresh();
 };
 
@@ -722,6 +732,14 @@ $('cred-clear').onclick = async () => {
   $('cred-pass').value = '';
   $('cred-msg').textContent = 'cancellate';
   refresh();
+};
+
+$('cred-toggle').onclick = () => {
+  const input = $('cred-pass');
+  const visible = input.type === 'text';
+  input.type = visible ? 'password' : 'text';
+  $('cred-toggle').setAttribute('aria-label', visible ? 'Mostra password' : 'Nascondi password');
+  $('cred-toggle').setAttribute('aria-pressed', String(!visible));
 };
 
 // Invio in uno dei due campi = Salva: è un form di due righe, non serve altro.

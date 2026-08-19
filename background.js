@@ -1042,8 +1042,23 @@ async function handle(msg) {
     const { creds: cur = {} } = await get("creds");
     const password = msg.password || cur.password || "";
     if (!email || !password) return { error: "Servono email e password" };
-    await set({ creds: { email, password } });
-    // Il crawl era fermo proprio perché mancavano queste: appena ci sono, riparte.
+    await set({ creds: { email, password, verified: false, loginError: "" } });
+    let result;
+    try {
+      result = await login();
+    } catch (_) {
+      result = "network";
+    }
+    if (result !== "ok") {
+      const error = result === "failed"
+        ? "Credenziali rifiutate dal portale"
+        : "Impossibile verificare il login";
+      await set({ creds: { email, password, verified: false, loginError: error } });
+      await fail(new LoginError(result));
+      return { error };
+    }
+    await set({ creds: { email, password, verified: true, loginError: "" } });
+    // Il crawl era fermo proprio perché mancavano queste: appena sono verificate, riparte.
     sync();
     return { ok: true };
   }
@@ -1098,7 +1113,12 @@ async function handle(msg) {
       klSync: st.klSync || { state: "idle" },
       klBlocked: st.klBlocked || {},
       // La password non esce mai da qui: la dashboard sa solo se c'è.
-      creds: { email: (st.creds || {}).email || "", saved: !!(st.creds || {}).password },
+      creds: {
+        email: (st.creds || {}).email || "",
+        saved: !!(st.creds || {}).password,
+        verified: !!(st.creds || {}).verified && st.sync?.state !== "login",
+        error: (st.creds || {}).loginError || "",
+      },
       version: chrome.runtime.getManifest().version,
       // Senza questo permesso l'estensione non si fa viva su nessun sito: la dashboard
       // deve poterlo dire, perché da fuori sembrerebbe solo che non trova mai niente.

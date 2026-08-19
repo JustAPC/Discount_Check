@@ -684,6 +684,38 @@
         font-size: 12.5px;
         padding: 7px 9px;
       }
+      .pass-row {
+        display: flex;
+        align-items: center;
+        position: relative;
+      }
+      .pass-row input {
+        padding-right: 34px;
+      }
+      .pass-toggle {
+        position: absolute;
+        right: 5px;
+        display: flex;
+        padding: 4px;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: var(--ink-3);
+        cursor: pointer;
+      }
+      .pass-toggle:hover {
+        background: var(--raise);
+        color: var(--ink);
+      }
+      .err-text {
+        color: var(--err-ink);
+      }
+      summary .n.ok {
+        color: var(--cb-ink);
+      }
+      summary .n.bad {
+        color: var(--err-ink);
+      }
 
       .sr-only {
         position: absolute;
@@ -777,6 +809,10 @@
       <symbol id="i-x" viewBox="0 0 24 24">
         <path d="M6 6 18 18" />
         <path d="M18 6 6 18" />
+      </symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24">
+        <path d="M3.5 12s3-5 8.5-5 8.5 5 8.5 5-3 5-8.5 5-8.5-5-8.5-5Z" />
+        <circle cx="12" cy="12" r="2" />
       </symbol>
       <symbol id="i-alert" viewBox="0 0 24 24">
         <path d="M12 4.5 21 19.5H3z" />
@@ -950,13 +986,18 @@
                 placeholder="email del portale"
                 aria-label="Email dell'account Corporate Benefits"
               />
-              <input
-                id="cred-pass"
-                type="password"
-                autocomplete="off"
-                placeholder="password"
-                aria-label="Password dell'account Corporate Benefits"
-              />
+              <div class="pass-row">
+                <input
+                  id="cred-pass"
+                  type="password"
+                  autocomplete="off"
+                  placeholder="password"
+                  aria-label="Password dell'account Corporate Benefits"
+                />
+                <button class="pass-toggle" id="cred-toggle" type="button" aria-label="Mostra password" aria-pressed="false">
+                  <svg class="ic"><use href="#i-eye" /></svg>
+                </button>
+              </div>
               <div class="hd-actions" style="margin: 6px 0 0">
                 <button class="btn primary" id="cred-save">Salva</button>
                 <button class="btn" id="cred-clear">Cancella</button>
