@@ -1,7 +1,7 @@
 name: build
 
 # Il workflow verifica, impacchetta e archivia l'estensione. Quando la versione del
-# manifest non ha ancora una GitHub Release, pubblica anche quella con lo ZIP allegato.
+# manifest non ha ancora una GitHub Release, pubblica anche quella con gli ZIP allegati.
 on:
   push:
     branches: [main]
@@ -43,11 +43,43 @@ jobs:
             -x '.git/*' '.github/*' '.claude/*' 'dist/*' 'server/*' 'hermes-skill/*' \
                '.impeccable/*' '*.md' 'test.js' '.gitignore' '.prettierrc*' 'store/*' '*.DS_Store'
 
+      # Firefox MV3 usa una background page non persistente: prepara una variante
+      # del manifest con scripts, ID Gecko e consenso per le credenziali trasmesse.
+      - name: Build Firefox package
+        run: |
+          mkdir -p dist/firefox-package
+          rsync -a . dist/firefox-package/ \
+            --exclude '.git' --exclude '.github' --exclude '.claude' --exclude 'dist' \
+            --exclude 'server' --exclude 'hermes-skill' --exclude '.impeccable' \
+            --exclude '*.md' --exclude 'test.js' --exclude '.gitignore' \
+            --exclude '.prettierrc*' --exclude 'store' --exclude '*.DS_Store'
+          jq '
+            .background = {scripts: ["background.js"]} |
+            .browser_specific_settings = {
+              gecko: {
+                id: "discount-check@andreapontillo.it",
+                strict_min_version: "140.0",
+                data_collection_permissions: {
+                  required: ["authenticationInfo"]
+                }
+              },
+              gecko_android: {
+                strict_min_version: "142.0"
+              }
+            }
+          ' manifest.json > dist/firefox-package/manifest.json
+          (cd dist/firefox-package && zip -r ../discount-check-firefox.zip .)
+
+      - name: Validate Firefox package
+        run: npx --yes web-ext lint --source-dir dist/firefox-package
+
       # Artifact da caricare anche sul Developer Dashboard dello Store.
       - uses: actions/upload-artifact@v4
         with:
           name: discount-check-${{ steps.v.outputs.v }}
-          path: dist/discount-check.zip
+          path: |
+            dist/discount-check.zip
+            dist/discount-check-firefox.zip
           if-no-files-found: error
 
       - name: Create GitHub Release
@@ -59,4 +91,13 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Discount Check ${{ steps.v.outputs.tag }}" \
             --generate-notes \
-            dist/discount-check.zip
+            dist/discount-check.zip \
+            dist/discount-check-firefox.zip
+
+      - name: Upload assets to existing GitHub Release
+        if: steps.v.outputs.release_needed == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ steps.v.outputs.tag }}" \
+            dist/discount-check.zip dist/discount-check-firefox.zip --clobber
