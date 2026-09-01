@@ -10,7 +10,7 @@ const listener = { addListener: noop };
 let store = {};
 const ctx = {
   console,
-  URL, TextDecoder, fetch: () => Promise.resolve({ text: () => Promise.resolve('') }),
+  URL, URLSearchParams, TextDecoder, fetch: () => Promise.resolve({ text: () => Promise.resolve('') }),
   chrome: {
     runtime: { onInstalled: listener, onStartup: listener, onMessage: listener,
       getManifest: () => ({ version: '0.0.0' }) },
@@ -22,13 +22,17 @@ const ctx = {
         set: o => { Object.assign(store, o); return Promise.resolve(); }
       }
     },
-    action: {}, scripting: {},
-    tabs: { onUpdated: listener },
+    action: {
+      setBadgeText: () => Promise.resolve(),
+      setBadgeBackgroundColor: () => Promise.resolve(),
+      setBadgeTextColor: () => Promise.resolve(),
+    }, scripting: {},
+    tabs: { onUpdated: listener, query: () => Promise.resolve([]) },
     permissions: { contains: () => Promise.resolve(true) }
   }
 };
 vm.createContext(ctx);
-vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild, collapsed, wordKeys, storeIndex, domLabel, handle };', ctx);
+vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild, collapsed, wordKeys, storeIndex, domLabel, handle, fetchText, setBadge, refreshWarningBadge, hasWarning };', ctx);
 const T = ctx.__T;
 
 let fail = 0;
@@ -378,6 +382,60 @@ eq('storeIndex: alias ancora utile, tenuto',
 
   await T.handle({ type: 'revUnalias', domain: 'zalando-lounge.it', key: 'loungebyzalando' });
   eq('revUnalias: staccato', store.revAliases, {});
+
+  // Sessione scaduta: login e conferma privacy devono essere automatici nello stesso crawl.
+  store = { creds: { email: 'utente@example.com', password: 'segreta' } };
+  const requests = [];
+  ctx.fetch = (url, options = {}) => {
+    requests.push([url, options.method || 'GET', options.body ? options.body.toString() : '']);
+    const n = requests.length;
+    const body = n === 1
+      ? '<html>login</html>'
+      : n === 2
+        ? '<html>/logout</html>'
+        : n === 3
+          ? `<html>/logout<div class="${'cbg-user-disclaimer--form'}"></div></html>`
+          : n === 4
+            ? '<html>/logout</html>'
+            : '<html>/logout scheda offerta</html>';
+    return Promise.resolve({ text: () => Promise.resolve(body) });
+  };
+  const recovered = await T.fetchText('/offer/123/cat/45');
+  eq('fetchText: login + privacy automatici',
+    [recovered, requests.length, requests.map(([url, method]) => [url, method])],
+    [
+      '<html>/logout scheda offerta</html>',
+      5,
+      [
+        ['https://almaviva.convenzioniaziendali.it/offer/123/cat/45', 'GET'],
+        ['https://almaviva.convenzioniaziendali.it/login', 'POST'],
+        ['https://almaviva.convenzioniaziendali.it/offer/123/cat/45', 'GET'],
+        ['https://almaviva.convenzioniaziendali.it/', 'POST'],
+        ['https://almaviva.convenzioniaziendali.it/offer/123/cat/45', 'GET'],
+      ],
+    ]);
+
+  let badge;
+  ctx.chrome.action.setBadgeText = ({ tabId, text }) => {
+    badge = { tabId, text };
+    return Promise.resolve();
+  };
+  ctx.chrome.action.setBadgeBackgroundColor = () => Promise.resolve();
+  await T.setBadge(7, { offers: [], rev: [], kl: [], warning: true });
+  eq('setBadge: usa il punto esclamativo nella posizione del conteggio', badge, { tabId: 7, text: '!' });
+  ctx.chrome.tabs.query = () => Promise.resolve([{ id: 1 }, { id: 2 }]);
+  store = { sync: { state: 'login' } };
+  await T.refreshWarningBadge();
+  eq('refreshWarningBadge: funziona senza URL delle tab', badge.text, '!');
+  ctx.chrome.tabs.query = () => Promise.resolve([{ id: 1, url: 'chrome://extensions/' }]);
+  store = { sync: { state: 'idle' } };
+  await T.refreshWarningBadge();
+  eq('refreshWarningBadge: cancella il warning risolto', badge.text, '');
+  eq('hasWarning: considera anche errori delle fonti',
+    [T.hasWarning({ state: 'idle', revSync: { state: 'error' } }, true),
+      T.hasWarning({ state: 'idle', klSync: { state: 'error' } }, true),
+      T.hasWarning({ state: 'idle' }, true)],
+    [true, true, false]);
 
   console.log(fail ? `\n${fail} test falliti` : '\nTutti i test passati');
   process.exit(fail ? 1 : 0);

@@ -68,6 +68,13 @@ chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === "resume") resume();
 });
 
+function hasWarning(st, shopAccess) {
+  return shopAccess === false ||
+    ["login", "suspect", "error"].includes(st.state) ||
+    st.revSync?.state === "error" ||
+    st.klSync?.state === "error";
+}
+
 // Il service worker può essere terminato a metà crawl: qui si riprende la coda.
 async function resume() {
   const { sync: st, queue = [] } = await get(["sync", "queue"]);
@@ -147,18 +154,18 @@ function accept() {
   return acceptP;
 }
 
-async function fetchText(path, retry = true) {
+async function fetchText(path, retries = 0) {
   const r = await fetch(PORTAL + path, { credentials: "include", redirect: "follow" });
   const t = await r.text();
   // Se la sessione è scaduta il portale serve la pagina di login: niente /logout.
   if (!t.includes("/logout")) {
-    const res = retry ? await login() : "failed";
+    const res = retries < 2 ? await login() : "failed";
     if (res !== "ok") throw new LoginError(res);
-    return fetchText(path, false);
+    return fetchText(path, retries + 1);
   }
   if (t.includes(DISCLAIMER)) {
-    if (!retry || !(await accept())) throw new LoginError("disclaimer");
-    return fetchText(path, false);
+    if (retries >= 2 || !(await accept())) throw new LoginError("disclaimer");
+    return fetchText(path, retries + 1);
   }
   return t;
 }
@@ -220,6 +227,7 @@ async function sync() {
         collapse: 1,
         sync: { state: "suspect", found: live.size, had, at: Date.now() },
       });
+      await refreshWarningBadge();
       running = false;
       return;
     }
@@ -283,6 +291,7 @@ async function drain() {
 
     catalog.updatedAt = Date.now();
     await set({ catalog, queue: [], sync: { state: "idle", total, done: total, at: Date.now() } });
+    await refreshWarningBadge();
     await rebuild(catalog);
     unwatchQueue();
   } catch (e) {
@@ -305,6 +314,7 @@ async function fail(e) {
       error: e instanceof LoginError ? null : String((e && e.message) || e),
     },
   });
+  await refreshWarningBadge();
 }
 
 // --- parsing ---------------------------------------------------------------
@@ -709,6 +719,8 @@ chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
   });
 });
 
+refreshWarningBadge();
+
 async function visit(tabId, url) {
   let host;
   try {
@@ -719,7 +731,7 @@ async function visit(tabId, url) {
   const res = await checkHost(host);
   // Il badge si aggiorna comunque: prima dipendeva dal content script, quindi sui siti
   // dove non veniva mostrato niente restava quello della tab precedente.
-  setBadge(tabId, res);
+  await setBadge(tabId, res);
   if (res.muted) return;
 
   const has = res.offers.length || res.rev.length || res.kl.length;
@@ -738,17 +750,40 @@ async function visit(tabId, url) {
   }
 }
 
-function setBadge(tabId, res) {
+async function setBadge(tabId, res) {
   const skip = () => {}; // la tab può sparire mentre rispondiamo
   const n = res.muted ? 0 : res.offers.length + res.rev.length + res.kl.length;
-  chrome.action.setBadgeText({ tabId, text: n ? String(n) : "" }).catch(skip);
-  // Ambra se il conteggio c'è ma la sessione al portale è scaduta: il numero è vero,
-  // per usarlo serve rifare login. Senza numero il colore non si vede: non lo tocchiamo.
-  if (n) {
-    chrome.action
-      .setBadgeBackgroundColor({ tabId, color: res.needLogin ? "#b45309" : "#16a34a" })
-      .catch(skip);
+  const text = res.warning ? "!" : n ? String(n) : "";
+  const operations = [
+    chrome.action.setBadgeText({ tabId, text }).catch(skip),
+    chrome.action.setBadgeTextColor({ tabId, color: res.warning ? "#111827" : "#ffffff" }).catch(skip),
+  ];
+  if (text) {
+    operations.push(chrome.action.setBadgeBackgroundColor({
+        tabId,
+        color: res.warning ? "#facc15" : res.needLogin ? "#b45309" : "#16a34a",
+      }).catch(skip));
   }
+  await Promise.all(operations);
+}
+
+async function refreshWarningBadge() {
+  const [{ sync: st = {}, revSync = {}, klSync = {} }, shopAccess] = await Promise.all([
+    get(["sync", "revSync", "klSync"]),
+    chrome.permissions.contains(SHOP_ORIGINS),
+  ]);
+  const tabs = await chrome.tabs.query({});
+  const warning = hasWarning({ ...st, revSync, klSync }, shopAccess);
+  await Promise.all(tabs.map(async (tab) => {
+    if (!tab.id) return;
+    if (warning) {
+      return setBadge(tab.id, { offers: [], rev: [], kl: [], warning: true });
+    }
+    if (!/^https?:/.test(tab.url || "")) {
+      return setBadge(tab.id, { offers: [], rev: [], kl: [] });
+    }
+    return setBadge(tab.id, await checkHost(new URL(tab.url).hostname));
+  }));
 }
 
 async function nudgeOpen() {
@@ -766,21 +801,28 @@ async function checkHost(host) {
     "muted",
     "snooze",
     "sync",
+    "revSync",
     "revolut",
     "ridx",
     "revBlocked",
     "klarna",
+    "klSync",
     "kidx",
     "klBlocked",
   ]);
   const catalog = st.catalog || { offers: {} };
   const d = etld1(host);
+  const shopAccess = await chrome.permissions.contains(SHOP_ORIGINS);
   const base = {
     offers: [],
     rev: [],
     kl: [],
     domain: d,
     needLogin: !!(st.sync && st.sync.state === "login"),
+    warning: hasWarning(
+      { ...(st.sync || {}), revSync: st.revSync, klSync: st.klSync },
+      shopAccess,
+    ),
     empty: Object.keys(catalog.offers).length === 0,
   };
 
@@ -1089,6 +1131,8 @@ async function handle(msg) {
     const offers = (st.catalog || {}).offers || {};
     const revolut = st.revolut || { offers: [] };
     const klarna = st.klarna || { offers: [] };
+    const shopAccess = await chrome.permissions.contains(SHOP_ORIGINS);
+    await refreshWarningBadge();
     return {
       sync: st.sync || { state: "idle" },
       updatedAt: (st.catalog || {}).updatedAt || 0,
@@ -1122,7 +1166,7 @@ async function handle(msg) {
       version: chrome.runtime.getManifest().version,
       // Senza questo permesso l'estensione non si fa viva su nessun sito: la dashboard
       // deve poterlo dire, perché da fuori sembrerebbe solo che non trova mai niente.
-      shopAccess: await chrome.permissions.contains(SHOP_ORIGINS),
+      shopAccess,
     };
   }
 

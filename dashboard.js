@@ -74,8 +74,12 @@ async function refresh() {
         : st.reason === 'disclaimer'
         ? 'Apri il portale, premi Conferma sul popup "Riservatezza sulle convenzioni!" e rilancia Aggiorna tutto.'
         : 'Il portale ha rifiutato le credenziali salvate. Il catalogo resta attivo, ma può essere incompleto.');
-    const b = el('button', 'btn', 'Inserisci le credenziali');
+    const b = el('button', 'btn', st.reason === 'disclaimer' ? 'Apri il portale' : 'Inserisci le credenziali');
     b.onclick = () => {
+      if (st.reason === 'disclaimer') {
+        send({ type: 'openPortal' });
+        return;
+      }
       $('d-creds').open = true;
       $('d-creds').scrollIntoView({ block: 'nearest' });
       $('cred-email').focus();

@@ -67,7 +67,8 @@ Da qui in poi non devi fare più nulla: il catalogo si aggiorna da solo ogni 24 
 
 Non si usa: si fa vedere lei.
 
-- **Badge sull'icona** appena apri un sito convenzionato — sai subito che c'è qualcosa da guardare
+- **Badge sull'icona** appena apri un sito convenzionato — sai subito che c'è qualcosa da guardare;
+  se c'è un avviso persistente, il conteggio viene sostituito da `!` nero su fondo giallo
 - **Popup al checkout**, riconosciuto da quattro segnali indipendenti: il **percorso**
   (`/checkout`, `/cart`, `/confirm`, `/gp/buy`…), un **campo carta**, un **modulo di
   spedizione** (nome + indirizzo + CAP), o il **testo del bottone**. I due centrali non hanno
@@ -94,8 +95,9 @@ il crawl lungo del portale. **Aggiorna tutto** le muove tutte e tre.
 
 Al primo accesso di ogni sessione il portale mostra il popup **"Riservatezza sulle convenzioni!"** e
 finché non lo confermi risponde con la home al posto di ogni scheda offerta: il crawl gira a vuoto.
-L'estensione lo riconosce e lo conferma da sola. Se la dashboard ti mostra comunque **"Conferma
-richiesta dal portale"**, apri il portale, premi **Conferma** sul popup e rilancia **Aggiorna tutto**.
+L'estensione rifà il login con le credenziali salvate e lo conferma da sola. Se la dashboard ti mostra
+comunque **"Conferma richiesta dal portale"**, apri il portale, premi **Conferma** sul popup e rilancia
+**Aggiorna tutto**: significa che il portale non ha accettato la conferma automatica.
 
 **"Credenziali mancanti" o "Login al portale fallito"**
 
