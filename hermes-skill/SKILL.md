@@ -48,15 +48,38 @@ Gli screenshot sono alti decine di migliaia di pixel. Dati interi a un modello v
 ridimensionati e i badge diventano illeggibili: **vanno sempre tagliati prima**.
 
 ```bash
-python split_revolut.py <screenshot> ./crops
+RUN_DIR=$(mktemp -d)
+python split_revolut.py <screenshot> "$RUN_DIR"
 ```
 
-Lo script taglia sulle bande uniformi dello stitching, quindi nessuna card resta spezzata.
-Stampa una riga per striscia con dimensioni e coordinate.
+Lo script ricava l'altezza dei crop dalle bande di stitching. Se non trova un ritmo regolare,
+la ricava dalla larghezza dell'immagine. I crop si sovrappongono e coprono sempre l'intera
+altezza. Non assumere una risoluzione o un'altezza fissa.
+
+Per ogni screenshot produce un `<nome>_manifest.json` con dimensioni, strategia, coordinate e
+lista esatta dei crop. Analizza solo i file elencati nei manifest. Se un crop contiene troppe
+card, oppure nome e badge non sono leggibili insieme, scegli un'altezza più piccola e ripeti:
+
+```bash
+python split_revolut.py <screenshot> "$RUN_DIR" --target-height <altezza_scelta>
+```
+
+Scegli il nuovo valore guardando il crop problematico, non copiandolo da run precedenti. Lo
+split è concluso quando ogni manifest riporta `uncovered_pixels: 0` e tutti i crop sono
+leggibili o possono essere classificati come parziali al passo 3.
 
 ### 3. Lettura
 
-Guardare **una striscia alla volta**, in ordine. Per ogni card leggere:
+Guardare **un crop alla volta**, nell'ordine dei manifest. Dopo ogni chiamata vision, appendere
+subito una riga JSON a `$RUN_DIR/reads.jsonl`; non affidare l'elenco alla memoria della chat:
+
+```json
+{"crop":"/percorso/crop.png","first":"Primo nome","last":"Ultimo nome","cards":[{"name":"Wizz Air","channel":"online","badge_raw":"2 per 1 €","boosted":false}],"discarded":0}
+```
+
+`crop` deve essere il percorso esatto del manifest. `first` e `last` sono le prime e ultime
+card anche quando sono parziali: servono a controllare la continuità fra crop sovrapposti. Per
+ogni card leggere:
 
 | Campo | Dove |
 |---|---|
@@ -79,13 +102,19 @@ Altre regole:
 
 - Le intestazioni (`Negozi`, `Le tue offerte`, `Scopri di più`), la barra dei tab e il saldo
   punti in alto a destra non sono negozi.
-- Lo stesso negozio può comparire in più strisce o in più immagini: si tiene una riga sola.
+- Lo stesso negozio può comparire in più crop o più immagini: prima si conserva ogni occorrenza
+  in `reads.jsonl`, poi si deduplica. Il numero di occorrenze non deve perdersi.
 - **Stesso negozio con tassi diversi** (es. `dott` 10x viola e `Dott` 2x grigio): **non
   decidere da solo, mai.** Va portato al passo 4 come conflitto, mostrando entrambi i valori:
   decide Andrea quale tenere. Un duplicato può anche voler dire che si è letto male un nome,
   quindi nasconderlo con una regola automatica nasconde un errore.
 - Ogni negozio letto va tenuto, anche quando è **identico** a com'è già a catalogo: non
   comparirà in nessuna tabella, ma deve finire nell'upsert del passo 6.
+
+Prima di deduplicare, confrontare via codice i percorsi `crop` di `reads.jsonl` con quelli di
+tutti i manifest. Devono coincidere esattamente, senza mancanti o duplicati. Se non coincidono,
+leggere i crop mancanti e rifare il controllo. Non costruire il diff finché questo criterio non
+è soddisfatto.
 
 ### 3-bis. Controllo dei valori letti
 
@@ -106,6 +135,19 @@ così la differenza si vede, e segnato `[-]`: se è una lettura sbagliata, non t
 Se una striscia produce un valore dubbio, rileggerla **da sola** costa una chiamata: falla,
 invece di tirare a indovinare.
 
+**Seconda lettura obbligatoria.** Riapri il crop di origine per ogni negozio nuovo e per ogni
+record con nome, badge, tasso, colore o canale diverso dal catalogo. Conferma il valore anche
+quando la differenza è piccola. Se le due letture non coincidono, porta il conflitto al passo 4
+già segnato `[-]`.
+
+Prima di compilare la tabella 2, fai un ultimo passaggio vision su tutti i crop con la lista dei
+nomi che risulterebbero assenti. Lo scopo di questo passaggio è cercare soltanto quei nomi. Ogni
+nome ritrovato torna nell'elenco letto e viene rimosso dalle assenze.
+
+Se un nome nuovo è molto simile a un nome assente, per esempio `Be Your Bag` e `Be You Bag`,
+non creare due decisioni indipendenti. Mostrali come possibile rinomina, segnati `[-]`, e lascia
+la scelta ad Andrea.
+
 ### 4. La scheda di revisione
 
 Una risposta sola, con **tre tabelle a larghezza fissa**, una per tipo di azione: chi entra,
@@ -119,9 +161,10 @@ Vale una regola sopra tutte:
 > "Confermi i completamenti piu' plausibili?" e' una domanda inutile: Andrea non puo'
 > rispondere se non vede cosa stai per scrivere.
 
-Prima delle tabelle, tre righe di contesto: quanti tile letti e quanti scartati, quanti
-negozi ci sono a catalogo e di quando e' l'ultima lettura (`updated_at` dal passo 1), e cosa
-succede se non tocca niente.
+Prima delle tabelle mostra: immagini ricevute; crop generati e crop analizzati; occorrenze di
+card prima della deduplica e negozi unici dopo; card scartate; negozi a catalogo e data
+dell'ultima lettura (`updated_at` dal passo 1); cosa succede se Andrea non tocca niente. I crop
+generati e analizzati devono avere lo stesso numero.
 
 #### Dove va ogni negozio
 
@@ -344,5 +387,6 @@ La modifica arriva a tutte le estensioni entro 24 ore da sola, o subito se Andre
   vengono letti male in modo silenzioso: nel run del 12/08/2026 sono comparsi valori `9x`
   inesistenti (Samsung letto 9x invece di 4x, Ralph Lauren 9x invece di 5x) che a effort alto
   non si erano presentati. Qui un errore non si vede: entra a catalogo e ci resta.
-- Il tempo di questo lavoro sta nelle chiamate vision, una per striscia — non nel modello.
-  Se serve accorciarlo, raggruppa più strisce per chiamata invece di sacrificare l'accuratezza.
+- Il modello decide la dimensione dei crop in base a ciò che riesce a leggere. Per ridurre le
+  chiamate può aumentare `--target-height`, ma deve ripetere i crop in cui nome e badge non sono
+  leggibili insieme. Il controllo manifest contro `reads.jsonl` resta obbligatorio.

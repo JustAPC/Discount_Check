@@ -42,7 +42,7 @@ Due punti fermi:
 | Tema | Scelta |
 |---|---|
 | Cattura | 1-2 screenshot lunghi stitchati, si analizza tutto ciò che c'è nell'immagine |
-| Split | dentro Hermes, `code_execution` + Pillow, strisce da 6-8 tile |
+| Split | dentro Hermes, `code_execution` + Pillow, crop adattivi con overlap e manifest |
 | Vision | il modello che Hermes usa già: `gpt-5.5` via provider `openai-codex` — nessuna chiave nuova |
 | Mapping nome→dominio | **il campo `domain` sul server**, curato negozio per negozio. Il matcher sui nomi resta solo per chi non ce l'ha |
 | Host API | `sconti-api.andreapontillo.tech` via Cloudflare Tunnel |
@@ -185,15 +185,17 @@ Niente differenze per piano carta (Standard/Premium/Metal).
 - Docker su TrueNAS per `sconti-api`; MariaDB `negozi_revolut` già presente
 - Python 3.11 + Pillow 12.2 anche sul PC (utile solo per test locali dello split)
 
-## Split — verificato sugli screenshot reali (2026-08-11)
+## Split — verificato sugli screenshot reali (2026-09-04)
 
-`split_revolut.py` taglia sulle bande uniformi lasciate dallo stitching, non a passo fisso:
-nessuna card spezzata. Misurato su `Screenshot_20260811_174533` (720×27110) → 27 strisce e
-`_174623` (720×14562) → 14 strisce, tutte 720×1080 tranne testa e coda. Passo delle bande:
-1080 px. A quella dimensione nome, badge e colore sono letti senza errori.
+`split_revolut.py` rileva il ritmo delle bande uniformi lasciate dallo stitching. Quando il
+ritmo non è affidabile, ricava l'altezza dalla larghezza dell'immagine. I crop hanno overlap,
+coprono sempre l'intera altezza e vengono elencati in un manifest JSON. Il modello può
+ripetere uno screenshot con `--target-height` quando un crop contiene troppe card, senza
+riusare misure prese da immagini precedenti.
 
-Fallback già nel codice: se le bande non ci sono (screenshot non stitchato), taglia a passo
-fisso con `MAX_STRIP`.
+Il controllo del 2026-09-04 sui nuovi screenshot, con altezze da 2935 a 9339 px, ha prodotto
+43 crop e 11 manifest con copertura verticale del 100%. Il test automatico copre anche code
+corte, falso ritmo delle righe UI, overlap e override scelto dal modello.
 
 ## Esito del primo run reale (2026-08-12)
 
@@ -206,10 +208,10 @@ Tutte le incognite sono cadute:
   con `uv`. La procedura è nella skill, non va reimparata ogni volta;
 - ingest completato e scritto su MariaDB.
 
-Costo reale: qualche minuto per due immagini, quasi tutto speso nelle chiamate vision
-sequenziali (una per striscia). Il modello non è il collo di bottiglia — il numero di
-chiamate lo è. Se un giorno desse fastidio: abbassare il reasoning effort e raggruppare
-più strisce per chiamata, prima di pensare a modelli diversi.
+Costo reale: qualche minuto per due immagini, quasi tutto speso nelle chiamate vision. Il
+modello non è il collo di bottiglia, lo è il numero di chiamate. Per ridurle si aumenta
+`--target-height` e si rileggono soltanto i crop che perdono leggibilità. Il controllo tra
+manifest e ledger deve continuare a coprire ogni crop.
 
 Due cose emerse dall'uso, entrambe già risolte nella skill:
 
