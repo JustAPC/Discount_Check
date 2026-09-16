@@ -32,7 +32,7 @@ const ctx = {
   }
 };
 vm.createContext(ctx);
-vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild, collapsed, wordKeys, storeIndex, domLabel, handle, fetchText, setBadge, refreshWarningBadge, hasWarning };', ctx);
+vm.runInContext(src + '\n;globalThis.__T = { parseOffer, nameKeys, etld1, matchIds, dec, klOffer, checkHost, rebuild, collapsed, wordKeys, storeIndex, domLabel, handle, fetchText, setBadge, refreshWarningBadge, hasWarning, syncFresh };', ctx);
 const T = ctx.__T;
 
 let fail = 0;
@@ -436,6 +436,14 @@ eq('storeIndex: alias ancora utile, tenuto',
       T.hasWarning({ state: 'idle', klSync: { state: 'error' } }, true),
       T.hasWarning({ state: 'idle' }, true)],
     [true, true, false]);
+  eq('syncFresh: running senza timestamp o scaduto non resta attivo',
+    [
+      T.syncFresh({ state: 'running' }, 120000),
+      T.syncFresh({ state: 'running', at: 0 }, 120000),
+      T.syncFresh({ state: 'running', at: 1 }, 120000),
+      T.syncFresh({ state: 'idle', at: 119999 }, 120000),
+    ],
+    [false, false, true, false]);
 
   console.log(fail ? `\n${fail} test falliti` : '\nTutti i test passati');
   process.exit(fail ? 1 : 0);

@@ -13,6 +13,7 @@ const MIN_TOKEN = 7; // lunghezza minima di un token per valere da solo come chi
 const COLLAPSE_MIN = 50; // sotto questa taglia un catalogo può dimezzarsi per motivi veri
 const SNOOZE_MS = 2 * 60 * 60 * 1000;
 const NUDGE_MS = 24 * 60 * 60 * 1000;
+const SYNC_STALE_MS = 2 * 60 * 1000;
 
 const AFFILIATE = /(tradetracker|awin|zanox|webgains|affilinet|tradedoubler|daisycon|belboon|effiliation)\./;
 const VOUCHER_SHOP = /vouchers-at-work\.com$/;
@@ -25,6 +26,8 @@ const NOT_SHOP =
 
 const get = (k) => chrome.storage.local.get(k);
 const set = (o) => chrome.storage.local.set(o);
+const syncFresh = (st, now = Date.now()) =>
+  !!st && st.state === "running" && Number.isFinite(st.at) && now - st.at < SYNC_STALE_MS;
 
 // --- lifecycle -------------------------------------------------------------
 
@@ -56,7 +59,11 @@ chrome.runtime.onStartup.addListener(async () => {
   // Browser chiuso a metà crawl: la coda è ancora in storage, la sveglia va rimessa
   // o quel crawl non ripartirebbe più da solo.
   const { sync: st, queue = [] } = await get(["sync", "queue"]);
-  if (st && st.state === "running" && queue.length) watchQueue();
+  if (!st || st.state !== "running") return;
+  if (queue.length) return watchQueue();
+  // La fase categorie non ha ancora una coda: se il worker è morto qui, ricomincia.
+  await set({ sync: { ...st, state: "idle", at: Date.now() } });
+  sync();
 });
 
 chrome.alarms.onAlarm.addListener((a) => {
@@ -181,8 +188,13 @@ const collapsed = (found, had, seen) => had >= COLLAPSE_MIN && found < had / 2 &
 
 async function sync() {
   if (running) return;
-  const { sync: st } = await get("sync");
-  if (st && st.state === "running") return;
+  const { sync: st, queue = [] } = await get(["sync", "queue"]);
+  if (st && st.state === "running") {
+    if (syncFresh(st)) return;
+    // Se esiste una coda, conserva il lavoro già scoperto e riprendi da lì.
+    if (queue.length) return drain();
+    await set({ sync: { ...st, state: "idle", at: Date.now() } });
+  }
 
   // Senza credenziali il crawl può solo fallire: il portale servirebbe la pagina di
   // login a ogni richiesta. Meglio non partire e dirlo, che far girare ogni giorno una
@@ -190,7 +202,7 @@ async function sync() {
   if (!(await creds())) return fail(new LoginError("nocreds"));
 
   running = true;
-  await set({ sync: { state: "running", phase: "categorie", total: 0, done: 0 } });
+  await set({ sync: { state: "running", phase: "categorie", total: 0, done: 0, at: Date.now() } });
   try {
     const home = await fetchText("/");
     const cats = [...new Set([...home.matchAll(/\/overview\/(\d+)/g)].map((m) => m[1]))];
@@ -239,7 +251,7 @@ async function sync() {
       catalog,
       queue,
       homeTitle,
-      sync: { state: "running", phase: "offerte", total: queue.length, done: 0 },
+      sync: { state: "running", phase: "offerte", total: queue.length, done: 0, at: Date.now() },
     });
     watchQueue();
     running = false;
@@ -285,7 +297,7 @@ async function drain() {
         }
       }
       if (++n % SAVE_EVERY === 0) {
-        await set({ queue, catalog, sync: { ...st, total, done: total - queue.length } });
+        await set({ queue, catalog, sync: { ...st, total, done: total - queue.length, at: Date.now() } });
       }
     }
 

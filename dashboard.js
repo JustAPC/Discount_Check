@@ -51,7 +51,7 @@ async function refresh() {
   const st = S.sync || {};
   // "Aggiorna tutto" muove tutte e tre le fonti: finché una lavora il bottone resta
   // occupato e il polling continua, altrimenti Revolut e Klarna finivano in silenzio.
-  const running = st.state === 'running' || busy(S.revSync) || busy(S.klSync);
+  const running = busy(st) || busy(S.revSync) || busy(S.klSync);
 
   $('dot').className = 'dot' + (running ? ' run' : st.state === 'login' ? ' warn'
     : st.state === 'suspect' ? ' warn' : st.state === 'error' ? ' err' : '');
